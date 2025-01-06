@@ -1,0 +1,78 @@
+name: StorageSlots
+version: '${project.version}'
+main: dev.lsdmc.StorageSlots
+api-version: '1.13'
+author: PsyChNOdelic
+description: Storage system with rank progression
+
+softdepend: [PlayerPoints, Vault, LuckPerms]
+
+commands:
+  storage:
+    description: Open your storage interface
+    usage: /<command>
+    aliases: [slots]
+  buystorage:
+    description: Purchase a storage slot
+    usage: /<command> <slot>
+    aliases: [buyslot]
+  storagecost:
+    description: Set the cost of a storage slot
+    usage: /<command> <slot> <cost>
+    permission: storageslots.admin
+  storagereload:
+    description: Reload the plugin configuration
+    usage: /<command>
+    permission: storageslots.admin
+  storagedelete:
+    description: Reset storage data for a player or all players
+    usage: /<command> <player|all>
+    permission: storageslots.admin
+    aliases: [slotreset]
+  storageadmin:
+    description: View and manage a player's storage
+    usage: /<command> <player>
+    permission: storageslots.admin
+    aliases: [slotadmin]
+  viewstorage:
+    description: View an offline player's storage
+    usage: /<command> <player>
+    permission: storageslots.admin
+    aliases: [viewslots]
+  removeslot:
+    description: Remove a specific slot from a player
+    usage: /<command> <player> <slot>
+    permission: storageslots.admin
+    aliases: [slotremove]
+  giveslot:
+    description: Give a specific slot to a player
+    usage: /<command> <player> <slot>
+    permission: storageslots.admin
+    aliases: [slotgive]
+  listslots:
+    description: List all slots owned by a player
+    usage: /<command> <player>
+    permission: storageslots.admin
+    aliases: [slotstatus]
+
+permissions:
+  storageslots.use:
+    description: Allows using the storage system
+    default: true
+  storageslots.bypass.rank:
+    description: Bypass rank requirements for slots
+    default: op
+  storageslots.bypass.cost:
+    description: Bypass cost requirements for slots
+    default: op
+  storageslots.admin:
+    description: Access to administrative commands
+    default: op
+  storageslots.*:
+    description: Grants all StorageSlots permissions
+    default: op
+    children:
+      storageslots.use: true
+      storageslots.bypass.rank: true
+      storageslots.bypass.cost: true
+      storageslots.admin: true

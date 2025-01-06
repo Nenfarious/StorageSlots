@@ -1,0 +1,108 @@
+# StorageSlots Configuration
+
+storage:
+  # Number of storage slots (1-54)
+  slots: 9
+
+  # GUI Title (supports color codes and %player% placeholder)
+  title: "&8Storage"
+
+  # Default cost if not specified below
+  default-cost: 1000
+
+  # Require previous slot to be unlocked before buying next
+  require_progression: true
+
+  # Individual slot costs
+  costs:
+    slot-1: 1000
+    slot-2: 2500
+    slot-3: 5000
+    slot-4: 10000
+    slot-5: 25000
+    slot-6: 50000
+    slot-7: 100000
+    slot-8: 250000
+    slot-9: 500000
+
+  # Items that cannot be stored
+  prohibited-items:
+    - "DIAMOND_SWORD"
+    - "NETHERITE_SWORD"
+    - "DIAMOND_CHESTPLATE"
+    - "NETHERITE_CHESTPLATE"
+    - "DIAMOND_HELMET"
+    - "NETHERITE_HELMET"
+
+# Rank requirements for slots
+ranks:
+  slot-requirements:
+    slot-1: "rank.i"
+    slot-2: "rank.h"
+    slot-3: "rank.g"
+    slot-4: "rank.f"
+    slot-5: "rank.e"
+    slot-6: "rank.d"
+    slot-7: "rank.c"
+    slot-8: "rank.b"
+    slot-9: "rank.a"
+
+  display-names:
+    "rank.i": "&7I-Rank"
+    "rank.h": "&6H-Rank"
+    "rank.g": "&eG-Rank"
+    "rank.f": "&aF-Rank"
+    "rank.e": "&bE-Rank"
+    "rank.d": "&3D-Rank"
+    "rank.c": "&9C-Rank"
+    "rank.b": "&5B-Rank"
+    "rank.a": "&4A-Rank"
+
+# GUI Settings
+gui:
+  locked-slot:
+    # Material for locked slots when player has the required rank
+    has-rank-material: "RED_STAINED_GLASS_PANE"
+    # Material for locked slots when player doesn't have the required rank
+    no-rank-material: "BLACK_STAINED_GLASS_PANE"
+    # Material for locked slots in admin view
+    admin-view-material: "GRAY_STAINED_GLASS_PANE"
+    # Name format for locked slots
+    name: "&c&lLocked Slot #%slot%"
+    # Lore for locked slots
+    lore:
+      - "&7Cost: &e%cost% %currency%"
+      - "&7Required Rank: &e%rank%"
+      - "&7Progress: %progress%"
+      - "&eClick to purchase!"
+
+# Messages
+messages:
+  # Basic messages
+  no-permission: "&cYou don't have permission to do this!"
+  invalid-slot: "&cInvalid slot number!"
+  invalid-number: "&cPlease enter a valid number!"
+  player-not-found: "&cPlayer not found!"
+
+  # Purchase messages
+  already-unlocked: "&cYou've already unlocked this slot!"
+  slot-purchased: "&aUnlocked slot %slot% for %cost% %currency%!"
+  insufficient-funds: "&cYou need %cost% %currency% to unlock this slot! &7(Balance: %balance%)"
+  prohibited-item: "&cYou cannot store this item!"
+  rank-required: "&cYou need %rank% to unlock this slot!"
+  previous-slot-required: "&cYou must unlock the previous slot first!"
+  cant-access-slot: "&cYou cannot access this slot yet!"
+
+  # Admin command messages
+  storage-reset: "&aAll storage data has been reset!"
+  player-storage-reset: "&aStorage data has been reset for %player%!"
+  slot-already-owned: "&c%player% already owns slot %slot%!"
+  slot-not-owned: "&c%player% doesn't own slot %slot%!"
+  slot-not-empty: "&cSlot %slot% for %player% contains items and cannot be removed!"
+  slot-given: "&aGave slot %slot% to %player%!"
+  slot-removed: "&aRemoved slot %slot% from %player%!"
+  no-slots-owned: "&c%player% doesn't own any slots!"
+
+  # Slot listing messages
+  slots-list-header: "&e=== Storage slots owned by %player% ==="
+  slots-list-format: "&7- Slot %slot%: %status%"
