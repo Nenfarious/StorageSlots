@@ -2,16 +2,30 @@ package dev.lsdmc;
 
 import org.bukkit.inventory.ItemStack;
 import java.util.*;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import java.io.Serializable;
 
-public class PlayerStorageData {
+public class PlayerStorageData implements Serializable, JsonSerializable {
+    private static final long serialVersionUID = 1L;
     private final UUID playerId;
     private final Map<Integer, ItemStack> items;
     private final Set<Integer> unlockedSlots;
+    private final Set<Integer> donorSlots;
+    private String currentDonorRank;
+    private final Set<String> activeDonorFeatures;
+    private final Set<String> donorFeatures;
+    private boolean dirty;
 
     public PlayerStorageData(UUID playerId) {
         this.playerId = playerId;
         this.items = new HashMap<>();
         this.unlockedSlots = new TreeSet<>(); // Using TreeSet for ordered slots
+        this.donorSlots = new HashSet<>();
+        this.currentDonorRank = null;
+        this.activeDonorFeatures = new HashSet<>();
+        this.donorFeatures = new HashSet<>();
     }
 
     public UUID getPlayerId() {
@@ -26,12 +40,24 @@ public class PlayerStorageData {
         return new HashSet<>(unlockedSlots);
     }
 
+    public Set<Integer> getDonorSlots() {
+        return new HashSet<>(donorSlots);
+    }
+
     public boolean hasSlotUnlocked(int slot) {
-        return unlockedSlots.contains(slot);
+        return unlockedSlots.contains(slot) || donorSlots.contains(slot);
+    }
+
+    public boolean isDonorSlot(int slot) {
+        return donorSlots.contains(slot);
     }
 
     public void unlockSlot(int slot) {
         unlockedSlots.add(slot);
+    }
+
+    public void unlockDonorSlot(int slot) {
+        donorSlots.add(slot);
     }
 
     public ItemStack getItem(int slot) {
@@ -47,41 +73,54 @@ public class PlayerStorageData {
     }
 
     public int getHighestUnlockedSlot() {
-        if (unlockedSlots.isEmpty()) {
+        if (unlockedSlots.isEmpty() && donorSlots.isEmpty()) {
             return -1;
         }
-        return Collections.max(unlockedSlots);
+        int regularMax = unlockedSlots.isEmpty() ? -1 : Collections.max(unlockedSlots);
+        int donorMax = donorSlots.isEmpty() ? -1 : Collections.max(donorSlots);
+        return Math.max(regularMax, donorMax);
     }
 
     public boolean hasNextSlotUnlocked(int slot) {
-        return unlockedSlots.contains(slot + 1);
+        return unlockedSlots.contains(slot + 1) || donorSlots.contains(slot + 1);
     }
 
     public boolean hasPreviousSlotUnlocked(int slot) {
-        return slot == 0 || unlockedSlots.contains(slot - 1);
+        return slot == 0 || unlockedSlots.contains(slot - 1) || donorSlots.contains(slot - 1);
     }
 
     public void lockSlot(int slot) {
         unlockedSlots.remove(slot);
+        donorSlots.remove(slot);
         items.remove(slot);
     }
 
     public void clear() {
         items.clear();
         unlockedSlots.clear();
+        donorSlots.clear();
+        currentDonorRank = null;
+        activeDonorFeatures.clear();
+        donorFeatures.clear();
     }
 
     public boolean hasAnyUnlockedSlots() {
-        return !unlockedSlots.isEmpty();
+        return !unlockedSlots.isEmpty() || !donorSlots.isEmpty();
     }
 
     public int getUnlockedSlotCount() {
-        return unlockedSlots.size();
+        return unlockedSlots.size() + donorSlots.size();
     }
 
     public List<ItemStack> getAllItems() {
         List<ItemStack> allItems = new ArrayList<>();
         for (int slot : unlockedSlots) {
+            ItemStack item = items.get(slot);
+            if (item != null) {
+                allItems.add(item.clone());
+            }
+        }
+        for (int slot : donorSlots) {
             ItemStack item = items.get(slot);
             if (item != null) {
                 allItems.add(item.clone());
@@ -94,15 +133,50 @@ public class PlayerStorageData {
         items.clear();
     }
 
+    public String getCurrentDonorRank() {
+        return currentDonorRank;
+    }
+
+    public void setCurrentDonorRank(String rank) {
+        this.currentDonorRank = rank;
+    }
+
+    public Set<String> getActiveDonorFeatures() {
+        return new HashSet<>(activeDonorFeatures);
+    }
+
+    public void addDonorFeature(String feature) {
+        activeDonorFeatures.add(feature);
+        donorFeatures.add(feature);
+    }
+
+    public void removeDonorFeature(String feature) {
+        activeDonorFeatures.remove(feature);
+        donorFeatures.remove(feature);
+    }
+
+    public boolean hasDonorFeature(String feature) {
+        return donorFeatures.contains(feature);
+    }
+
+    public Set<String> getDonorFeatures() {
+        return new HashSet<>(donorFeatures);
+    }
+
     // For data migration or version upgrades
     public void migrateSlot(int oldSlot, int newSlot) {
         if (hasSlotUnlocked(oldSlot)) {
             ItemStack item = items.remove(oldSlot);
+            boolean wasDonorSlot = donorSlots.remove(oldSlot);
             unlockedSlots.remove(oldSlot);
             if (item != null) {
                 items.put(newSlot, item);
             }
-            unlockedSlots.add(newSlot);
+            if (wasDonorSlot) {
+                donorSlots.add(newSlot);
+            } else {
+                unlockedSlots.add(newSlot);
+            }
         }
     }
 
@@ -110,7 +184,7 @@ public class PlayerStorageData {
     public boolean verifyDataIntegrity() {
         // Ensure no items exist in locked slots
         for (int slot : items.keySet()) {
-            if (!unlockedSlots.contains(slot)) {
+            if (!unlockedSlots.contains(slot) && !donorSlots.contains(slot)) {
                 return false;
             }
         }
@@ -128,5 +202,39 @@ public class PlayerStorageData {
     @Override
     public int hashCode() {
         return Objects.hash(playerId);
+    }
+
+    @Override
+    public void serialize(JsonObject json) {
+        JsonArray donorSlotsArray = new JsonArray();
+        for (int slot : donorSlots) {
+            donorSlotsArray.add(slot);
+        }
+        json.add("donorSlots", donorSlotsArray);
+
+        JsonArray donorFeaturesArray = new JsonArray();
+        for (String feature : donorFeatures) {
+            donorFeaturesArray.add(feature);
+        }
+        json.add("donorFeatures", donorFeaturesArray);
+    }
+
+    @Override
+    public void deserialize(JsonObject json) {
+        if (json.has("donorSlots")) {
+            JsonArray donorSlotsArray = json.getAsJsonArray("donorSlots");
+            donorSlots.clear();
+            for (JsonElement element : donorSlotsArray) {
+                donorSlots.add(element.getAsInt());
+            }
+        }
+
+        if (json.has("donorFeatures")) {
+            JsonArray donorFeaturesArray = json.getAsJsonArray("donorFeatures");
+            donorFeatures.clear();
+            for (JsonElement element : donorFeaturesArray) {
+                donorFeatures.add(element.getAsString());
+            }
+        }
     }
 }

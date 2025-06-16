@@ -5,6 +5,7 @@ api-version: '1.13'
 author: PsyChNOdelic
 description: Storage system with rank progression
 
+depend: [WorldGuard]
 softdepend: [PlayerPoints, Vault, LuckPerms]
 
 commands:
@@ -76,3 +77,21 @@ permissions:
       storageslots.bypass.rank: true
       storageslots.bypass.cost: true
       storageslots.admin: true
+
+  # Donor permissions
+  storageslots.donor.vip:
+    description: VIP donor rank benefits
+    default: false
+  storageslots.donor.mvp:
+    description: MVP donor rank benefits
+    default: false
+  storageslots.donor.elite:
+    description: Elite donor rank benefits
+    default: false
+  storageslots.donor.*:
+    description: Grants all donor rank benefits
+    default: op
+    children:
+      storageslots.donor.vip: true
+      storageslots.donor.mvp: true
+      storageslots.donor.elite: true

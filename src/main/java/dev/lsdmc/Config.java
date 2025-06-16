@@ -1,6 +1,7 @@
 package dev.lsdmc;
 
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -13,6 +14,9 @@ public class Config {
     private FileConfiguration config;
     private Map<String, String> cachedMessages;
     private final int MAX_SLOTS = 54;
+    private final Map<String, Double> withdrawalFeesPoints = new HashMap<>();
+    private final Map<String, Double> withdrawalFeesMoney = new HashMap<>();
+    private final Map<String, List<String>> commandTriggers = new HashMap<>();
 
     public Config(StorageSlots plugin) {
         this.plugin = plugin;
@@ -30,6 +34,27 @@ public class Config {
         config = plugin.getConfig();
         cachedMessages.clear();
         setDefaultValues();
+
+        // Load withdrawal fees
+        ConfigurationSection feesSection = config.getConfigurationSection("withdrawal-fees");
+        if (feesSection != null) {
+            for (String type : feesSection.getKeys(false)) {
+                ConfigurationSection typeSection = feesSection.getConfigurationSection(type);
+                if (typeSection != null) {
+                    withdrawalFeesPoints.put(type, typeSection.getDouble("points", 0.0));
+                    withdrawalFeesMoney.put(type, typeSection.getDouble("money", 0.0));
+                }
+            }
+        }
+
+        // Load command triggers
+        ConfigurationSection triggersSection = config.getConfigurationSection("command-triggers");
+        if (triggersSection != null) {
+            for (String type : triggersSection.getKeys(false)) {
+                List<String> commands = triggersSection.getStringList(type);
+                commandTriggers.put(type, commands);
+            }
+        }
     }
 
     private void setDefaultValues() {
@@ -38,6 +63,12 @@ public class Config {
         if (!config.contains("storage.title")) config.set("storage.title", "&8Storage");
         if (!config.contains("storage.default-cost")) config.set("storage.default-cost", 1000);
         if (!config.contains("storage.require_progression")) config.set("storage.require_progression", true);
+        
+        // Auto-save settings
+        if (!config.contains("storage.auto-save")) {
+            config.set("storage.auto-save.enabled", true);
+            config.set("storage.auto-save.interval", 300); // 5 minutes in seconds
+        }
 
         // GUI settings
         if (!config.contains("gui.locked-slot")) {
@@ -52,6 +83,14 @@ public class Config {
                     "&eClick to purchase!"
             );
             config.set("gui.locked-slot.lore", lore);
+        }
+
+        // Security settings
+        if (!config.contains("security")) {
+            config.set("security.max-slots-per-player", 54);
+            config.set("security.max-items-per-slot", 1);
+            config.set("security.prevent-item-duplication", true);
+            config.set("security.log-transactions", true);
         }
 
         // Messages
@@ -79,6 +118,8 @@ public class Config {
         defaults.put("player-not-found", "&cPlayer not found!");
         defaults.put("previous-slot-required", "&cYou must unlock the previous slot first!");
         defaults.put("cant-access-slot", "&cYou cannot access this slot yet!");
+        defaults.put("max-slots-reached", "&cYou have reached the maximum number of storage slots!");
+        defaults.put("max-items-per-slot", "&cYou can only store %max% item(s) per slot!");
 
         for (Map.Entry<String, String> entry : defaults.entrySet()) {
             if (!config.contains("messages." + entry.getKey())) {
@@ -92,6 +133,26 @@ public class Config {
         if (slots < 1 || slots > MAX_SLOTS) {
             plugin.getLogger().warning("Invalid slot count configured. Setting to default (9).");
             config.set("storage.slots", 9);
+        }
+
+        // Validate auto-save settings
+        int autoSaveInterval = config.getInt("storage.auto-save.interval", 300);
+        if (autoSaveInterval < 60) { // Minimum 1 minute
+            plugin.getLogger().warning("Auto-save interval too low. Setting to minimum (60 seconds).");
+            config.set("storage.auto-save.interval", 60);
+        }
+
+        // Validate security settings
+        int maxSlotsPerPlayer = config.getInt("security.max-slots-per-player", 54);
+        if (maxSlotsPerPlayer < 1 || maxSlotsPerPlayer > MAX_SLOTS) {
+            plugin.getLogger().warning("Invalid max slots per player. Setting to default (54).");
+            config.set("security.max-slots-per-player", 54);
+        }
+
+        int maxItemsPerSlot = config.getInt("security.max-items-per-slot", 1);
+        if (maxItemsPerSlot < 1) {
+            plugin.getLogger().warning("Invalid max items per slot. Setting to default (1).");
+            config.set("security.max-items-per-slot", 1);
         }
 
         validateMaterial("gui.locked-slot.has-rank-material", "RED_STAINED_GLASS_PANE");
@@ -242,5 +303,189 @@ public class Config {
 
     public void reloadConfig() {
         loadConfig();
+    }
+
+    // New getters for security settings
+    public boolean isAutoSaveEnabled() {
+        return config.getBoolean("storage.auto-save.enabled", true);
+    }
+
+    public int getAutoSaveInterval() {
+        return config.getInt("storage.auto-save.interval", 300);
+    }
+
+    public int getMaxSlotsPerPlayer() {
+        return Math.min(config.getInt("security.max-slots-per-player", 54), MAX_SLOTS);
+    }
+
+    public int getMaxItemsPerSlot() {
+        return config.getInt("security.max-items-per-slot", 1);
+    }
+
+    public boolean preventItemDuplication() {
+        return config.getBoolean("security.prevent-item-duplication", true);
+    }
+
+    public boolean logTransactions() {
+        return config.getBoolean("security.log-transactions", true);
+    }
+
+    // Withdrawal fee methods
+    public double getWithdrawalFeePoints(String slotType) {
+        return withdrawalFeesPoints.getOrDefault(slotType, 0.0);
+    }
+
+    public double getWithdrawalFeeMoney(String slotType) {
+        return withdrawalFeesMoney.getOrDefault(slotType, 0.0);
+    }
+
+    public String getSlotType(int slot) {
+        if (slot < 0 || slot >= getStorageSlots()) {
+            return "regular";
+        }
+
+        // Check donor ranks first
+        for (String rank : getDonorRanks()) {
+            ConfigurationSection rankSection = config.getConfigurationSection("donor-ranks." + rank);
+            if (rankSection != null) {
+                List<Integer> slots = rankSection.getIntegerList("slots");
+                if (slots.contains(slot)) {
+                    return rank;
+                }
+            }
+        }
+
+        // Check regular ranks
+        for (String rank : getRanks()) {
+            ConfigurationSection rankSection = config.getConfigurationSection("ranks." + rank);
+            if (rankSection != null) {
+                List<Integer> slots = rankSection.getIntegerList("slots");
+                if (slots.contains(slot)) {
+                    return rank;
+                }
+            }
+        }
+
+        return "regular";
+    }
+
+    public List<String> getCommandTriggers(String type) {
+        return commandTriggers.getOrDefault(type, new ArrayList<>());
+    }
+
+    public String formatCommandTrigger(String command, String player, double cost, int points) {
+        return command
+                .replace("%player%", player)
+                .replace("%cost%", String.valueOf(cost))
+                .replace("%points%", String.valueOf(points));
+    }
+
+    // Donor-related methods
+    public boolean isDonorEnabled() {
+        return config.getBoolean("donor.enabled", true);
+    }
+
+    public Set<String> getDonorRanks() {
+        return new HashSet<>(config.getConfigurationSection("donor.ranks").getKeys(false));
+    }
+
+    public Set<String> getRanks() {
+        return new HashSet<>(config.getConfigurationSection("ranks.slot-requirements").getKeys(false));
+    }
+
+    public String getDonorRankDisplayName(String rank) {
+        return formatText(config.getString("donor.ranks." + rank + ".display-name", rank));
+    }
+
+    public String getDonorRankPermission(String rank) {
+        return config.getString("donor.ranks." + rank + ".permission", "storageslots.donor." + rank);
+    }
+
+    public int getDonorRankSlots(String rank) {
+        return config.getInt("donor.ranks." + rank + ".slots", 0);
+    }
+
+    public List<String> getDonorRankFeatures(String rank) {
+        return config.getStringList("donor.ranks." + rank + ".features");
+    }
+
+    public boolean areDonorSlotsSeparate() {
+        return config.getBoolean("donor.slots.separate", true);
+    }
+
+    public boolean doDonorSlotsPersist() {
+        return config.getBoolean("donor.slots.persist", true);
+    }
+
+    public boolean areDonorSlotsPurchasable() {
+        return config.getBoolean("donor.slots.purchasable", false);
+    }
+
+    public double getDonorSlotCostMultiplier() {
+        return config.getDouble("donor.slots.cost-multiplier", 2.0);
+    }
+
+    public Material getDonorSlotMaterial() {
+        try {
+            return Material.valueOf(config.getString("gui.donor-slot.material", "GOLD_BLOCK").toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return Material.GOLD_BLOCK;
+        }
+    }
+
+    public String getDonorSlotName(int slot) {
+        return formatText(config.getString("gui.donor-slot.name", "&6&lDonor Slot #%slot%")
+                .replace("%slot%", String.valueOf(slot + 1)));
+    }
+
+    public List<String> getDonorSlotLore(String donorRank, List<String> features) {
+        List<String> lore = new ArrayList<>();
+        for (String line : config.getStringList("gui.donor-slot.lore")) {
+            if (line.contains("%donor_rank%")) {
+                line = line.replace("%donor_rank%", getDonorRankDisplayName(donorRank));
+            } else if (line.contains("%features%")) {
+                for (String feature : features) {
+                    lore.add("&7- " + formatFeatureName(feature));
+                }
+                continue;
+            }
+            lore.add(formatText(line));
+        }
+        return lore;
+    }
+
+    private String formatFeatureName(String feature) {
+        switch (feature) {
+            case "unlimited_items_per_slot":
+                return "&eUnlimited items per slot";
+            case "bypass_prohibited_items":
+                return "&eCan store prohibited items";
+            case "instant_purchase":
+                return "&eInstant slot purchase";
+            case "bypass_rank_requirements":
+                return "&eBypass rank requirements";
+            default:
+                return "&e" + feature.replace("_", " ");
+        }
+    }
+
+    public boolean isSafezoneEnabled() {
+        return config.getBoolean("storage.safezone.enabled", true);
+    }
+
+    public String getSafezoneDetectionMethod() {
+        return config.getString("storage.safezone.detection-method", "region");
+    }
+
+    public String getSafezoneRegionName() {
+        return config.getString("storage.safezone.region-name", "safezone");
+    }
+
+    public int getSafezonePvPPriority() {
+        return config.getInt("storage.safezone.pvp-priority", 0);
+    }
+
+    public String getSafezoneMessage() {
+        return getMessage("storage.safezone.message");
     }
 }

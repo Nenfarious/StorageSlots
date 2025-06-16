@@ -2,7 +2,22 @@
 
 storage:
   # Number of storage slots (1-54)
-  slots: 9
+  slots: 54
+  max-items-per-slot: 64
+  prevent-item-duplication: true
+
+  # Safe zone settings
+  safezone:
+    enabled: true
+    # Method to use for safezone detection
+    # Options: "region" (WorldGuard regions), "pvp" (PvP status)
+    detection-method: "region"
+    # Region name to check for (if using region method)
+    region-name: "safezone"
+    # PvP priority threshold (if using pvp method)
+    pvp-priority: 0
+    # Message to show when trying to use storage outside safezone
+    message: "&cYou can only use storage in safe zones!"
 
   # GUI Title (supports color codes and %player% placeholder)
   title: "&8Storage"
@@ -25,14 +40,98 @@ storage:
     slot-8: 250000
     slot-9: 500000
 
+  # Withdrawal fees
+  withdrawal-fees:
+    # Regular storage slots
+    regular:
+      points: 10
+      money: 100.0
+    # J-G rank slots
+    jg:
+      points: 5
+      money: 50.0
+    # F-D rank slots
+    fd:
+      points: 3
+      money: 30.0
+    # C-A rank slots
+    ca:
+      points: 1
+      money: 10.0
+    # Donor slots
+    donor:
+      points: 0
+      money: 0.0
+
+  # Command triggers for transactions
+  command-triggers:
+    # Commands to run when purchasing a slot
+    purchase:
+      - "eco take %player% %cost%"
+      - "points take %player% %points%"
+    # Commands to run when withdrawing items
+    withdraw:
+      - "eco take %player% %cost%"
+      - "points take %player% %points%"
+    # Commands to run when depositing items
+    deposit:
+      - "eco give %player% %cost%"
+      - "points give %player% %points%"
+
   # Items that cannot be stored
   prohibited-items:
-    - "DIAMOND_SWORD"
-    - "NETHERITE_SWORD"
-    - "DIAMOND_CHESTPLATE"
-    - "NETHERITE_CHESTPLATE"
-    - "DIAMOND_HELMET"
-    - "NETHERITE_HELMET"
+    - BEDROCK
+    - BARRIER
+    - COMMAND_BLOCK
+    - STRUCTURE_BLOCK
+    - STRUCTURE_VOID
+    - LIGHT
+
+# Donor features configuration
+donor:
+  # Enable/disable donor features
+  enabled: true
+  
+  # Donor ranks and their benefits
+  ranks:
+    vip:
+      display-name: "&aVIP"
+      permission: "storageslots.donor.vip"
+      slots: 3
+      features:
+        - "unlimited_items_per_slot"
+        - "bypass_prohibited_items"
+        - "free_withdrawal"
+    mvp:
+      display-name: "&bMVP"
+      permission: "storageslots.donor.mvp"
+      slots: 6
+      features:
+        - "unlimited_items_per_slot"
+        - "bypass_prohibited_items"
+        - "instant_purchase"
+        - "free_withdrawal"
+    elite:
+      display-name: "&6Elite"
+      permission: "storageslots.donor.elite"
+      slots: 9
+      features:
+        - "unlimited_items_per_slot"
+        - "bypass_prohibited_items"
+        - "instant_purchase"
+        - "bypass_rank_requirements"
+        - "free_withdrawal"
+
+  # Donor slot settings
+  slots:
+    # Whether donor slots are separate from regular slots
+    separate: true
+    # Whether donor slots persist after rank expires
+    persist: true
+    # Whether donor slots can be purchased with regular currency
+    purchasable: false
+    # Cost multiplier for purchasing donor slots (if purchasable)
+    cost-multiplier: 2.0
 
 # Rank requirements for slots
 ranks:
@@ -76,6 +175,17 @@ gui:
       - "&7Progress: %progress%"
       - "&eClick to purchase!"
 
+  donor-slot:
+    # Material for donor slots
+    material: "GOLD_BLOCK"
+    # Name format for donor slots
+    name: "&6&lDonor Slot #%slot%"
+    # Lore for donor slots
+    lore:
+      - "&7Donor Rank: &e%donor_rank%"
+      - "&7Features:"
+      - "%features%"
+
 # Messages
 messages:
   # Basic messages
@@ -92,6 +202,20 @@ messages:
   rank-required: "&cYou need %rank% to unlock this slot!"
   previous-slot-required: "&cYou must unlock the previous slot first!"
   cant-access-slot: "&cYou cannot access this slot yet!"
+
+  # Withdrawal messages
+  withdrawal-fee: "&7Withdrawal fee: &e%cost% %currency% or &e%points% points"
+  insufficient-withdrawal-funds: "&cYou need %cost% %currency% or %points% points to withdraw items!"
+  withdrawal-success: "&aSuccessfully withdrew items for %cost% %currency%"
+  withdrawal-success-points: "&aSuccessfully withdrew items for %points% points"
+  free-withdrawal: "&aFree withdrawal (Donor benefit)"
+
+  # Donor messages
+  donor-feature-disabled: "&cDonor features are currently disabled!"
+  donor-slot-limit: "&cYou have reached your donor slot limit!"
+  donor-slot-persist: "&aYour donor slots will persist after your rank expires!"
+  donor-slot-expired: "&cYour donor rank has expired! Your donor slots will be locked!"
+  donor-feature-unavailable: "&cThis feature is not available for your donor rank!"
 
   # Admin command messages
   storage-reset: "&aAll storage data has been reset!"
