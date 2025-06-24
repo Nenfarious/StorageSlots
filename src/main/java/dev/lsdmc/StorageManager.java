@@ -11,14 +11,50 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitRunnable;
 import java.util.UUID;
 import java.util.Set;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import org.bukkit.Material;
+import dev.lsdmc.utils.Constants;
+import net.kyori.adventure.text.Component;
 
 public class StorageManager implements Listener {
     private final StorageSlots plugin;
-    private final Config config;
+    private final StorageConfig config;
     private final StorageDataManager dataManager;
     private final StorageInventoryManager inventoryManager;
+    
+    // Track withdrawal cooldowns (player UUID -> slot -> cooldown end time)
+    private final Map<UUID, Map<Integer, Long>> withdrawalCooldowns = new ConcurrentHashMap<>();
+    
+    /**
+     * Get withdrawal cooldown duration from config
+     */
+    private long getWithdrawalCooldownMs() {
+        return config.getWithdrawalCooldownMs();
+    }
+    
+    /**
+     * Check if withdrawal cooldown should apply to this player
+     */
+    private boolean shouldApplyWithdrawalCooldown(Player player) {
+        if (!config.isWithdrawalCooldownEnabled()) {
+            return false;
+        }
+        
+        // Check bypass permission
+        if (config.canBypassWithdrawalCooldown(player)) {
+            return false;
+        }
+        
+        // Check if OPs should be affected (via plugin config)
+        if (player.isOp() && !plugin.getConfig().getBoolean("withdrawal-cooldown.apply-to-ops", true)) {
+            return false;
+        }
+        
+        return true;
+    }
 
-    public StorageManager(StorageSlots plugin, Config config) {
+    public StorageManager(StorageSlots plugin, StorageConfig config) {
         this.plugin = plugin;
         this.config = config;
         this.dataManager = new StorageDataManager(plugin);
@@ -45,6 +81,10 @@ public class StorageManager implements Listener {
             player.sendMessage(config.getSafezoneMessage());
             return;
         }
+        
+        // Mark that player has seen storage (for notification system)
+        plugin.markPlayerSeenStorage(player);
+        
         inventoryManager.openStorage(player);
     }
 
@@ -106,17 +146,19 @@ public class StorageManager implements Listener {
 
         PlayerStorageData data = dataManager.getPlayerData(targetId);
         if (data.hasSlotUnlocked(slot)) {
-            admin.sendMessage(config.getMessage("slot-already-owned")
-                    .replace("%player%", targetName)
-                    .replace("%slot%", String.valueOf(slot + 1)));
+            admin.sendMessage(config.getMessage("slot-already-owned", Map.of(
+                "player", targetName,
+                "slot", String.valueOf(slot + 1)
+            )));
             return;
         }
 
         data.unlockSlot(slot);
         dataManager.markDirty();
-        admin.sendMessage(config.getMessage("slot-given")
-                .replace("%player%", targetName)
-                .replace("%slot%", String.valueOf(slot + 1)));
+        admin.sendMessage(config.getMessage("slot-given", Map.of(
+            "player", targetName,
+            "slot", String.valueOf(slot + 1)
+        )));
     }
 
     public void removeSlot(Player admin, String targetName, int slot) {
@@ -133,25 +175,27 @@ public class StorageManager implements Listener {
 
         PlayerStorageData data = dataManager.getPlayerData(targetId);
         if (!data.hasSlotUnlocked(slot)) {
-            admin.sendMessage(config.getMessage("slot-not-owned")
-                    .replace("%player%", targetName)
-                    .replace("%slot%", String.valueOf(slot + 1)));
+            admin.sendMessage(config.getMessage("slot-not-owned", Map.of(
+                "player", targetName,
+                "slot", String.valueOf(slot + 1)
+            )));
             return;
         }
 
-        // Check if slot has items
         if (data.getItem(slot) != null) {
-            admin.sendMessage(config.getMessage("slot-not-empty")
-                    .replace("%player%", targetName)
-                    .replace("%slot%", String.valueOf(slot + 1)));
+            admin.sendMessage(config.getMessage("slot-not-empty", Map.of(
+                "player", targetName,
+                "slot", String.valueOf(slot + 1)
+            )));
             return;
         }
 
         data.lockSlot(slot);
         dataManager.markDirty();
-        admin.sendMessage(config.getMessage("slot-removed")
-                .replace("%player%", targetName)
-                .replace("%slot%", String.valueOf(slot + 1)));
+        admin.sendMessage(config.getMessage("slot-removed", Map.of(
+            "player", targetName,
+            "slot", String.valueOf(slot + 1)
+        )));
     }
 
     public void listSlots(Player admin, String targetName) {
@@ -165,20 +209,23 @@ public class StorageManager implements Listener {
         Set<Integer> slots = data.getUnlockedSlots();
 
         if (slots.isEmpty()) {
-            admin.sendMessage(config.getMessage("no-slots-owned")
-                    .replace("%player%", targetName));
+            admin.sendMessage(config.getMessage("no-slots-owned", Map.of(
+                "player", targetName
+            )));
             return;
         }
 
-        admin.sendMessage(config.getMessage("slots-list-header")
-                .replace("%player%", targetName));
+        admin.sendMessage(config.getMessage("slots-list-header", Map.of(
+            "player", targetName
+        )));
 
         for (int slot : slots) {
             ItemStack item = data.getItem(slot);
             String status = item != null ? item.getType().toString() : "Empty";
-            admin.sendMessage(config.getMessage("slots-list-format")
-                    .replace("%slot%", String.valueOf(slot + 1))
-                    .replace("%status%", status));
+            admin.sendMessage(config.getMessage("slots-list-format", Map.of(
+                "slot", String.valueOf(slot + 1),
+                "status", status
+            )));
         }
     }
 
@@ -188,14 +235,12 @@ public class StorageManager implements Listener {
             return;
         }
 
-        // Validate player state first
         if (!player.isOnline()) {
             return;
         }
 
         PlayerStorageData data = dataManager.getPlayerData(player.getUniqueId());
-        
-        // Check max slots per player
+
         if (data.getUnlockedSlotCount() >= config.getMaxSlotsPerPlayer()) {
             player.sendMessage(config.getMessage("max-slots-reached"));
             return;
@@ -213,64 +258,70 @@ public class StorageManager implements Listener {
             return;
         }
 
-        // Check progression requirement
-        if (config.isProgressionRequired() && slot > 0 && !data.hasSlotUnlocked(slot - 1)) {
+        // Check progression requirement with proper logic
+        if (config.isProgressionRequired() && !canPlayerUnlockSlot(player, slot, data)) {
             player.sendMessage(config.getMessage("previous-slot-required"));
             return;
         }
 
         String requiredRank = config.getRequiredRank(slot);
-        if (!config.checkRankRequirement(player, requiredRank)) {
-            player.sendMessage(config.getMessage("rank-required")
-                    .replace("%rank%", config.getRankDisplay(requiredRank)));
+        if (!config.hasRankRequirement(player, requiredRank)) {
+            player.sendMessage(config.getMessage("rank-required", Map.of(
+                "rank", requiredRank
+            )));
             return;
         }
 
-        double cost = config.getSlotCost(slot);
+        double baseCost = config.getSlotCost(slot);
+        
+        // Apply donor discount if applicable
+        final double cost = data.hasDonorFeature("slot_discount") ? baseCost * 0.9 : baseCost;
+        
+        if (config.logTransactions()) {
+            plugin.getLogger().info("Player " + player.getName() + " attempting to purchase slot " + (slot + 1) + 
+                " for " + cost + " points (base: " + baseCost + ", discount: " + data.hasDonorFeature("slot_discount") + ")");
+        }
+        
         plugin.getEconomyManager().takeMoney(player, cost).thenAccept(success -> {
+            if (config.logTransactions()) {
+                plugin.getLogger().info("Player " + player.getName() + " slot purchase result: " + success);
+            }
             if (!success || !player.isOnline()) {
                 if (player.isOnline()) {
                     plugin.getEconomyManager().getBalance(player).thenAccept(balance -> {
-                        String message = config.getMessage("insufficient-funds")
-                                .replace("%cost%", plugin.getEconomyManager().formatCurrency(cost))
-                                .replace("%currency%", plugin.getEconomyManager().getCurrencyName())
-                                .replace("%balance%", plugin.getEconomyManager().formatCurrency(balance));
-                        player.sendMessage(message);
+                        player.sendMessage(config.getMessage("insufficient-funds", Map.of(
+                            "cost", plugin.getEconomyManager().formatCurrency(cost),
+                            "currency", plugin.getEconomyManager().getCurrencyName(),
+                            "balance", plugin.getEconomyManager().formatCurrency(balance)
+                        )));
                     });
                 }
                 return;
             }
 
-            // Run on main thread to ensure thread safety
             Bukkit.getScheduler().runTask(plugin, () -> {
                 if (!player.isOnline()) {
                     return;
                 }
 
-                // Update data
-                        data.unlockSlot(slot);
-                        dataManager.markDirty();
+                data.unlockSlot(slot);
+                dataManager.markDirty();
 
-                // Log transaction if enabled
                 if (config.logTransactions()) {
                     plugin.getLogger().info(String.format("Player %s purchased slot %d for %s",
                             player.getName(), slot + 1, plugin.getEconomyManager().formatCurrency(cost)));
                 }
 
-                // Update inventory if open
-                        if (player.getOpenInventory() != null &&
-                                inventoryManager.isValidStorageInventory(player.getOpenInventory().getTitle())) {
-                            Inventory topInventory = player.getOpenInventory().getTopInventory();
-                    // Only update the specific slot that was purchased
-                    topInventory.setItem(slot, null);
+                if (player.getOpenInventory() != null &&
+                        inventoryManager.isValidStorageInventory(player.getOpenInventory().getTitle())) {
+                    inventoryManager.updateSlotInOpenInventory(player, slot);
                 }
 
-                // Send success message
-                String message = config.getMessage("slot-purchased")
-                        .replace("%slot%", String.valueOf(slot + 1))
-                        .replace("%cost%", plugin.getEconomyManager().formatCurrency(cost))
-                        .replace("%currency%", plugin.getEconomyManager().getCurrencyName());
-                player.sendMessage(message);
+                player.sendMessage(config.getMessage("slot-purchased", Map.of(
+                    "slot", String.valueOf(slot + 1),
+                    "cost", plugin.getEconomyManager().formatCurrency(cost),
+                    "currency", plugin.getEconomyManager().getCurrencyName()
+                )));
             });
         });
     }
@@ -279,23 +330,24 @@ public class StorageManager implements Listener {
         if (!config.isDonorEnabled()) {
             return false;
         }
-
-        // Check if player has any donor rank
-        for (String rank : config.getDonorRanks()) {
-            if (player.hasPermission(config.getDonorRankPermission(rank))) {
-                // Check if this slot is within the donor rank's slot range
-                int donorSlots = config.getDonorRankSlots(rank);
-                if (config.areDonorSlotsSeparate()) {
-                    // If separate, donor slots start after regular slots
-                    return slot >= config.getStorageSlots() && 
-                           slot < config.getStorageSlots() + donorSlots;
-                } else {
-                    // If not separate, donor slots are mixed with regular slots
-                    return slot < donorSlots;
-                }
-            }
+        
+        // Donor slots are now slots 11-15 (positions 3-7 of second row)
+        if (slot < 11 || slot > 15) {
+            return false;
         }
-        return false;
+        
+        // Check if player has any donor rank
+        var highestRankOpt = config.getHighestDonorRank(player);
+        if (highestRankOpt.isEmpty()) {
+            return false;
+        }
+        
+        StorageConfig.DonorRank highestRank = highestRankOpt.get();
+        int availableDonorSlots = Math.min(highestRank.slots(), 5); // Max 5 donor slots
+        int donorSlotIndex = slot - 11; // Convert to 0-based donor slot index (0-4)
+        
+        // Check if this specific donor slot is available to the player's rank
+        return donorSlotIndex < availableDonorSlots;
     }
 
     private void handleDonorSlotPurchase(Player player, int slot, PlayerStorageData data) {
@@ -303,82 +355,84 @@ public class StorageManager implements Listener {
             player.sendMessage(config.getMessage("donor-feature-unavailable"));
             return;
         }
-
+        
         // Find the highest donor rank the player has
-        final String[] highestRank = {null};
+        StorageConfig.DonorRank highestRank = null;
         int maxSlots = 0;
-        for (String rank : config.getDonorRanks()) {
-            if (player.hasPermission(config.getDonorRankPermission(rank))) {
-                int slots = config.getDonorRankSlots(rank);
-                if (slots > maxSlots) {
-                    maxSlots = slots;
-                    highestRank[0] = rank;
+        
+        // Check if player is OP or has donor.* permission
+        if (player.isOp() || player.hasPermission("storageslots.donor.*")) {
+            var highestRankOpt = config.getHighestDonorRank(player);
+            if (highestRankOpt.isPresent()) {
+                highestRank = highestRankOpt.get();
+                maxSlots = highestRank.slots();
+            }
+        } else {
+            // Check individual donor ranks
+            for (StorageConfig.DonorRank rank : config.getDonorRanks()) {
+                if (player.hasPermission(rank.permission())) {
+                    int slots = rank.slots();
+                    if (slots > maxSlots) {
+                        maxSlots = slots;
+                        highestRank = rank;
+                    }
                 }
             }
         }
-
-        if (highestRank[0] == null) {
+        
+        if (highestRank == null) {
             player.sendMessage(config.getMessage("donor-feature-unavailable"));
             return;
         }
-
-        // Calculate cost with multiplier
+        
+        final StorageConfig.DonorRank donorRankToUse = highestRank;
         double baseCost = config.getSlotCost(slot);
         double cost = baseCost * config.getDonorSlotCostMultiplier();
-
+        
+        if (config.logTransactions()) {
+            plugin.getLogger().info("Player " + player.getName() + " attempting to purchase donor slot " + (slot + 1) + 
+                " for " + cost + " points (base: " + baseCost + ", multiplier: " + config.getDonorSlotCostMultiplier() + ")");
+        }
+        
         plugin.getEconomyManager().takeMoney(player, cost).thenAccept(success -> {
+            if (config.logTransactions()) {
+                plugin.getLogger().info("Player " + player.getName() + " donor slot purchase result: " + success);
+            }
             if (!success || !player.isOnline()) {
                 if (player.isOnline()) {
                     plugin.getEconomyManager().getBalance(player).thenAccept(balance -> {
-                        String message = config.getMessage("insufficient-funds")
-                                .replace("%cost%", plugin.getEconomyManager().formatCurrency(cost))
-                                .replace("%currency%", plugin.getEconomyManager().getCurrencyName())
-                                .replace("%balance%", plugin.getEconomyManager().formatCurrency(balance));
-                        player.sendMessage(message);
+                        player.sendMessage(config.getMessage("insufficient-funds", Map.of(
+                            "cost", plugin.getEconomyManager().formatCurrency(cost),
+                            "currency", plugin.getEconomyManager().getCurrencyName(),
+                            "balance", plugin.getEconomyManager().formatCurrency(balance)
+                        )));
                     });
                 }
                 return;
             }
-
-            // Run on main thread to ensure thread safety
             Bukkit.getScheduler().runTask(plugin, () -> {
                 if (!player.isOnline()) {
                     return;
                 }
-
-                // Update data
                 data.unlockDonorSlot(slot);
-                data.setCurrentDonorRank(highestRank[0]);
-                for (String feature : config.getDonorRankFeatures(highestRank[0])) {
+                data.setCurrentDonorRank(donorRankToUse.name());
+                for (String feature : donorRankToUse.features()) {
                     data.addDonorFeature(feature);
                 }
                 dataManager.markDirty();
-
-                // Log transaction if enabled
                 if (config.logTransactions()) {
                     plugin.getLogger().info(String.format("Player %s purchased donor slot %d for %s",
                             player.getName(), slot + 1, plugin.getEconomyManager().formatCurrency(cost)));
                 }
-
-                // Update inventory if open
-                if (player.getOpenInventory() != null && 
+                if (player.getOpenInventory() != null &&
                     inventoryManager.isValidStorageInventory(player.getOpenInventory().getTitle())) {
-                    Inventory topInventory = player.getOpenInventory().getTopInventory();
-                    // Only update the specific slot that was purchased
-                    topInventory.setItem(slot, null);
+                    inventoryManager.updateSlotInOpenInventory(player, slot);
                 }
-
-                // Send success message
-                String message = config.getMessage("slot-purchased")
-                        .replace("%slot%", String.valueOf(slot + 1))
-                        .replace("%cost%", plugin.getEconomyManager().formatCurrency(cost))
-                        .replace("%currency%", plugin.getEconomyManager().getCurrencyName());
-                player.sendMessage(message);
-
-                // Send donor slot persist message if applicable
-                if (config.doDonorSlotsPersist()) {
-                    player.sendMessage(config.getMessage("donor-slot-persist"));
-                }
+                player.sendMessage(config.getMessage("slot-purchased", Map.of(
+                    "slot", String.valueOf(slot + 1),
+                    "cost", plugin.getEconomyManager().formatCurrency(cost),
+                    "currency", plugin.getEconomyManager().getCurrencyName()
+                )));
             });
         });
     }
@@ -391,82 +445,349 @@ public class StorageManager implements Listener {
 
         if (!inventoryManager.isValidStorageInventory(title)) return;
 
-        event.setCancelled(true);
-
-        if (event.getClickedInventory() == null || event.getClickedInventory().equals(player.getInventory())) {
-            return;
-        }
-
+        // Don't cancel the event by default - let normal inventory operations work
+        
+        // Get clicked inventory and slot
+        Inventory clickedInventory = event.getClickedInventory();
+        if (clickedInventory == null) return;
+        
         int slot = event.getSlot();
         ItemStack clickedItem = event.getCurrentItem();
-
-        if (clickedItem == null) {
-            return;
-        }
-
+        ItemStack cursorItem = event.getCursor();
+        
         PlayerStorageData data = dataManager.getPlayerData(player.getUniqueId());
-        if (data == null) {
+        if (data == null) return;
+
+        // If clicking in the storage inventory (top inventory)
+        if (clickedInventory.equals(event.getView().getTopInventory())) {
+            // Check if clicking on a locked slot item (glass pane, gold block, bedrock)
+            if (clickedItem != null && isLockedSlotItem(clickedItem)) {
+                event.setCancelled(true);
+                handleSlotPurchase(player, slot, data);
+                return;
+            }
+            
+            // Check if clicking on bedrock (unavailable donor slot)
+            if (clickedItem != null && clickedItem.getType() == Material.BEDROCK) {
+                event.setCancelled(true);
+                return; // Do nothing for bedrock clicks
+            }
+            
+            // Check if the slot is unlocked for item operations
+            if (!data.hasSlotUnlocked(slot)) {
+                event.setCancelled(true);
+                return;
+            }
+            
+            // Check for prohibited items being placed into storage
+            if (cursorItem != null && !cursorItem.getType().isAir()) {
+                if (config.isProhibitedItem(cursorItem)) {
+                    event.setCancelled(true);
+                    player.sendMessage(config.getMessage(Constants.Messages.PROHIBITED_ITEM));
+                    return;
+                }
+                
+                // Check max items per slot
+                if (cursorItem.getAmount() > config.getMaxItemsPerSlot()) {
+                    event.setCancelled(true);
+                    player.sendMessage(config.getMessage(Constants.Messages.MAX_ITEMS_PER_SLOT, Map.of(
+                        "max", String.valueOf(config.getMaxItemsPerSlot())
+                    )));
+                    return;
+                }
+            }
+            
+            // Handle withdrawal fees and cooldowns for taking items out
+            if (clickedItem != null && !clickedItem.getType().isAir() && 
+                (cursorItem == null || cursorItem.getType().isAir()) && 
+                event.getAction() == InventoryAction.PICKUP_ALL) {
+                
+                // Check if cooldown should apply to this player
+                boolean applyCooldown = shouldApplyWithdrawalCooldown(player);
+                
+                if (applyCooldown) {
+                    // Clear expired cooldowns first
+                    clearExpiredCooldowns(player);
+                    
+                    // Check if player is on cooldown for this slot
+                    if (isOnWithdrawalCooldown(player, slot)) {
+                        event.setCancelled(true);
+                        long remainingMs = withdrawalCooldowns.get(player.getUniqueId()).get(slot) - System.currentTimeMillis();
+                        double remainingSeconds = remainingMs / 1000.0;
+                        player.sendMessage(Component.text("Please wait " + String.format("%.1f", remainingSeconds) + " seconds before withdrawing from this slot.")
+                            .color(Constants.Colors.ERROR));
+                        return;
+                    }
+                    
+                    // Set cooldown for this withdrawal (applies to all withdrawals, free or paid)
+                    setWithdrawalCooldown(player, slot);
+                }
+                
+                // Check if this is a donor slot or player has free withdrawal
+                boolean isDonorSlot = slot >= 11 && slot <= 15;
+                boolean hasFreeWithdrawal = data.hasDonorFeature("free_withdrawal") || isDonorSlot;
+                
+                if (!hasFreeWithdrawal) {
+                    // Paid withdrawal - cancel event and handle through fee system
+                    event.setCancelled(true);
+                    handleItemWithdrawal(player, slot, clickedItem, data);
+                    return;
+                } else {
+                    // Free withdrawal - cancel event and handle directly
+                    event.setCancelled(true);
+                    completeWithdrawal(player, slot, clickedItem, data);
+                    return;
+                }
+            }
+        } else if (clickedInventory.equals(event.getView().getBottomInventory())) {
+            // Player is clicking in their own inventory - check for shift-click to storage
+            if (event.isShiftClick() && clickedItem != null && !clickedItem.getType().isAir()) {
+                // Check for prohibited items being shift-clicked into storage
+                if (config.isProhibitedItem(clickedItem)) {
+                    event.setCancelled(true);
+                    player.sendMessage(config.getMessage(Constants.Messages.PROHIBITED_ITEM));
+                    return;
+                }
+                
+                // Check max items per slot for shift-click
+                if (clickedItem.getAmount() > config.getMaxItemsPerSlot()) {
+                    event.setCancelled(true);
+                    player.sendMessage(config.getMessage(Constants.Messages.MAX_ITEMS_PER_SLOT, Map.of(
+                        "max", String.valueOf(config.getMaxItemsPerSlot())
+                    )));
+                    return;
+                }
+            }
+        }
+        
+        // For all other valid clicks, allow normal operations
+        // The inventory will auto-save when closed
+    }
+    
+    private boolean isLockedSlotItem(ItemStack item) {
+        if (item == null || item.getType().isAir()) return false;
+        
+        // Check if it's one of our locked slot materials
+        return item.getType().name().contains("GLASS_PANE") || 
+               item.getType() == org.bukkit.Material.BARRIER ||
+               item.getType() == org.bukkit.Material.GOLD_BLOCK;
+        // Note: BEDROCK is intentionally excluded - clicking it should do nothing
+    }
+    
+    private void handleSlotPurchase(Player player, int slot, PlayerStorageData data) {
+        // Check if slot is already unlocked
+        if (data.hasSlotUnlocked(slot)) {
             return;
         }
-
-        // Handle item withdrawal
-        handleItemWithdrawal(player, slot, clickedItem, data);
+        
+        // Check progression requirement with proper logic
+        if (config.isProgressionRequired() && !canPlayerUnlockSlot(player, slot, data)) {
+            player.sendMessage(config.getMessage("previous-slot-required"));
+            return;
+        }
+        
+        // Check rank requirement
+        String requiredRank = config.getRequiredRank(slot);
+        if (!config.hasRankRequirement(player, requiredRank)) {
+            player.sendMessage(config.getMessage("rank-required", Map.of(
+                "rank", requiredRank
+            )));
+            return;
+        }
+        
+        // Proceed with purchase
+        purchaseSlot(player, slot);
+    }
+    
+    /**
+     * Check if a player can unlock a specific slot based on progression requirements
+     */
+    private boolean canPlayerUnlockSlot(Player player, int slot, PlayerStorageData data) {
+        if (!config.isProgressionRequired()) {
+            return true;
+        }
+        
+        if (slot == 0) {
+            return true; // First slot can always be unlocked
+        }
+        
+        // For regular slots (0-8), check if previous slot is unlocked
+        if (slot < 9) {
+            return data.hasSlotUnlocked(slot - 1);
+        }
+        
+        // For donor slots (11-15), check if player has donor access
+        if (slot >= 11 && slot <= 15) {
+            var donorRank = config.getHighestDonorRank(player);
+            if (donorRank.isEmpty()) {
+                return false;
+            }
+            
+            int donorSlotIndex = slot - 11; // Convert to 0-based index (0-4)
+            return donorSlotIndex < donorRank.get().slots();
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Check if a player is on withdrawal cooldown for a specific slot
+     */
+    private boolean isOnWithdrawalCooldown(Player player, int slot) {
+        Map<Integer, Long> playerCooldowns = withdrawalCooldowns.get(player.getUniqueId());
+        if (playerCooldowns == null) {
+            return false;
+        }
+        
+        Long cooldownEnd = playerCooldowns.get(slot);
+        if (cooldownEnd == null) {
+            return false;
+        }
+        
+        return System.currentTimeMillis() < cooldownEnd;
+    }
+    
+    /**
+     * Set withdrawal cooldown for a player and slot
+     */
+    private void setWithdrawalCooldown(Player player, int slot) {
+        withdrawalCooldowns.computeIfAbsent(player.getUniqueId(), k -> new ConcurrentHashMap<>())
+            .put(slot, System.currentTimeMillis() + getWithdrawalCooldownMs());
+    }
+    
+    /**
+     * Clear expired cooldowns for a player
+     */
+    private void clearExpiredCooldowns(Player player) {
+        Map<Integer, Long> playerCooldowns = withdrawalCooldowns.get(player.getUniqueId());
+        if (playerCooldowns != null) {
+            long currentTime = System.currentTimeMillis();
+            playerCooldowns.entrySet().removeIf(entry -> entry.getValue() < currentTime);
+            
+            if (playerCooldowns.isEmpty()) {
+                withdrawalCooldowns.remove(player.getUniqueId());
+            }
+        }
     }
 
     private void handleItemWithdrawal(Player player, int slot, ItemStack item, PlayerStorageData data) {
         // Check if player has free withdrawal
         if (data.hasDonorFeature("free_withdrawal")) {
-            player.sendMessage(config.getSafezoneMessage());
+            if (config.logTransactions()) {
+                plugin.getLogger().info("Player " + player.getName() + " has free withdrawal (donor feature)");
+            }
+            completeWithdrawal(player, slot, item, data);
             return;
         }
-
-        // Get withdrawal fee based on slot type
-        String slotType = data.isDonorSlot(slot) ? "donor" : config.getSlotType(slot);
-        int pointsFee = (int) config.getWithdrawalFeePoints(slotType);
-        double moneyFee = config.getWithdrawalFeeMoney(slotType);
-
-        // Show withdrawal fee message
-        String feeMessage = config.getMessage("withdrawal-fee")
-                .replace("%cost%", plugin.getEconomyManager().formatCurrency(moneyFee))
-                .replace("%currency%", plugin.getEconomyManager().getCurrencyName())
-                .replace("%points%", String.valueOf(pointsFee));
-        player.sendMessage(feeMessage);
-
-        // Check if player has enough points
-        plugin.getEconomyManager().getBalance(player).thenAccept(balance -> {
-            if (balance >= pointsFee) {
-                // Execute withdrawal with points
-                executeWithdrawal(player, slot, item, data, pointsFee, true);
-            } else {
-                // Check if player has enough money
-                plugin.getEconomyManager().getBalance(player).thenAccept(moneyBalance -> {
-                    if (moneyBalance >= moneyFee) {
-                        // Execute withdrawal with money
-                        executeWithdrawal(player, slot, item, data, moneyFee, false);
-                    } else {
-                        // Not enough funds
-                        String message = config.getMessage("insufficient-withdrawal-funds")
-                                .replace("%cost%", plugin.getEconomyManager().formatCurrency(moneyFee))
-                                .replace("%currency%", plugin.getEconomyManager().getCurrencyName())
-                                .replace("%points%", String.valueOf(pointsFee));
-                        player.sendMessage(message);
-                    }
-                });
+        
+        // Get withdrawal fees based on player's rank and donor status
+        StorageConfig.WithdrawalFee withdrawalFee = config.getWithdrawalFee(player);
+        int pointsFee = withdrawalFee.points();
+        double moneyFee = withdrawalFee.money();
+        
+        if (config.logTransactions()) {
+            plugin.getLogger().info("Player " + player.getName() + " withdrawal fee: " + pointsFee + " points, " + moneyFee + " money");
+        }
+        
+        // If both fees are 0, allow free withdrawal
+        if (pointsFee == 0 && moneyFee == 0) {
+            if (config.logTransactions()) {
+                plugin.getLogger().info("Player " + player.getName() + " has free withdrawal (no fees)");
             }
-        });
+            completeWithdrawal(player, slot, item, data);
+            return;
+        }
+        
+        // Show withdrawal fee message
+        if (pointsFee > 0 && moneyFee > 0) {
+            player.sendMessage(config.getMessage("withdrawal-fee", Map.of(
+                "fee", plugin.getEconomyManager().formatCurrency(moneyFee),
+                "currency", plugin.getEconomyManager().getCurrencyName(),
+                "points", String.valueOf(pointsFee)
+            )));
+        } else if (pointsFee > 0) {
+            player.sendMessage(config.getMessage("withdrawal-fee", Map.of(
+                "fee", String.valueOf(pointsFee),
+                "currency", "points",
+                "points", String.valueOf(pointsFee)
+            )));
+        } else if (moneyFee > 0) {
+            player.sendMessage(config.getMessage("withdrawal-fee", Map.of(
+                "fee", plugin.getEconomyManager().formatCurrency(moneyFee),
+                "currency", plugin.getEconomyManager().getCurrencyName(),
+                "points", "0"
+            )));
+        }
+        
+        final int finalPointsFee = pointsFee;
+        final double finalMoneyFee = moneyFee;
+        
+        // Try points first if available
+        if (pointsFee > 0) {
+            plugin.getEconomyManager().getBalance(player).thenAccept(balance -> {
+                if (config.logTransactions()) {
+                    plugin.getLogger().info("Player " + player.getName() + " balance: " + balance + ", required: " + finalPointsFee);
+                }
+                if (balance >= finalPointsFee) {
+                    executeWithdrawal(player, slot, item, data, finalPointsFee, true);
+                } else if (finalMoneyFee > 0) {
+                    // Try money if points insufficient
+                    plugin.getEconomyManager().getBalance(player).thenAccept(moneyBalance -> {
+                        if (config.logTransactions()) {
+                            plugin.getLogger().info("Player " + player.getName() + " money balance: " + moneyBalance + ", required: " + finalMoneyFee);
+                        }
+                        if (moneyBalance >= finalMoneyFee) {
+                            executeWithdrawal(player, slot, item, data, finalMoneyFee, false);
+                        } else {
+                            player.sendMessage(config.getMessage("insufficient-withdrawal-funds", Map.of(
+                                "fee", plugin.getEconomyManager().formatCurrency(finalMoneyFee),
+                                "currency", plugin.getEconomyManager().getCurrencyName(),
+                                "points", String.valueOf(finalPointsFee)
+                            )));
+                        }
+                    });
+                } else {
+                    player.sendMessage(config.getMessage("insufficient-points", Map.of(
+                        "points", String.valueOf(finalPointsFee),
+                        "balance", String.valueOf(balance.intValue())
+                    )));
+                }
+            });
+        } else if (moneyFee > 0) {
+            // Only money fee
+            plugin.getEconomyManager().getBalance(player).thenAccept(moneyBalance -> {
+                if (config.logTransactions()) {
+                    plugin.getLogger().info("Player " + player.getName() + " money balance: " + moneyBalance + ", required: " + finalMoneyFee);
+                }
+                if (moneyBalance >= finalMoneyFee) {
+                    executeWithdrawal(player, slot, item, data, finalMoneyFee, false);
+                } else {
+                    player.sendMessage(config.getMessage("insufficient-withdrawal-funds", Map.of(
+                        "fee", plugin.getEconomyManager().formatCurrency(finalMoneyFee),
+                        "currency", plugin.getEconomyManager().getCurrencyName(),
+                        "balance", plugin.getEconomyManager().formatCurrency(moneyBalance)
+                    )));
+                }
+            });
+        }
     }
 
     private void executeWithdrawal(Player player, int slot, ItemStack item, PlayerStorageData data, double fee, boolean usePoints) {
-        // Check if player has enough funds
         if (usePoints) {
+            if (config.logTransactions()) {
+                plugin.getLogger().info("Player " + player.getName() + " executing withdrawal with " + (int)fee + " points");
+            }
             plugin.getEconomyManager().takePoints(player, (int)fee).thenAccept(success -> {
+                if (config.logTransactions()) {
+                    plugin.getLogger().info("Player " + player.getName() + " points withdrawal result: " + success);
+                }
                 if (!success || !player.isOnline()) {
                     if (player.isOnline()) {
                         plugin.getEconomyManager().getBalance(player).thenAccept(balance -> {
-                            String message = config.getMessage("insufficient-points")
-                                    .replace("%cost%", String.valueOf((int)fee))
-                                    .replace("%balance%", String.valueOf(balance.intValue()));
-                            player.sendMessage(message);
+                            player.sendMessage(config.getMessage("insufficient-points", Map.of(
+                                "points", String.valueOf((int)fee),
+                                "balance", String.valueOf(balance.intValue())
+                            )));
                         });
                     }
                     return;
@@ -474,15 +795,21 @@ public class StorageManager implements Listener {
                 completeWithdrawal(player, slot, item, data);
             });
         } else {
+            if (config.logTransactions()) {
+                plugin.getLogger().info("Player " + player.getName() + " executing withdrawal with " + fee + " money");
+            }
             plugin.getEconomyManager().takeMoney(player, fee).thenAccept(success -> {
+                if (config.logTransactions()) {
+                    plugin.getLogger().info("Player " + player.getName() + " money withdrawal result: " + success);
+                }
                 if (!success || !player.isOnline()) {
                     if (player.isOnline()) {
                         plugin.getEconomyManager().getBalance(player).thenAccept(balance -> {
-                            String message = config.getMessage("insufficient-funds")
-                                    .replace("%cost%", plugin.getEconomyManager().formatCurrency(fee))
-                                    .replace("%currency%", plugin.getEconomyManager().getCurrencyName())
-                                    .replace("%balance%", plugin.getEconomyManager().formatCurrency(balance));
-                            player.sendMessage(message);
+                            player.sendMessage(config.getMessage("insufficient-funds", Map.of(
+                                "cost", plugin.getEconomyManager().formatCurrency(fee),
+                                "currency", plugin.getEconomyManager().getCurrencyName(),
+                                "balance", plugin.getEconomyManager().formatCurrency(balance)
+                            )));
                         });
                     }
                     return;
@@ -493,36 +820,35 @@ public class StorageManager implements Listener {
     }
 
     private void completeWithdrawal(Player player, int slot, ItemStack item, PlayerStorageData data) {
-        // Run on main thread to ensure thread safety
         Bukkit.getScheduler().runTask(plugin, () -> {
             if (!player.isOnline()) {
                 return;
             }
-
-            // Remove item from storage
+            
+            // Get the original item from storage (without withdrawal fee lore)
+            ItemStack originalItem = data.getItem(slot);
+            if (originalItem == null) {
+                originalItem = item; // Fallback to the clicked item
+            }
+            
+            // Clear the slot in storage
             data.setItem(slot, null);
             dataManager.markDirty();
-
-            // Give item to player
-            player.getInventory().addItem(item);
-
-            // Log transaction if enabled
+            
+            // Give the original item (without lore modifications) to the player
+            player.getInventory().addItem(originalItem.clone());
+            
             if (config.logTransactions()) {
                 plugin.getLogger().info(String.format("Player %s withdrew item from slot %d",
                         player.getName(), slot + 1));
             }
-
-            // Update inventory if open
-            if (player.getOpenInventory() != null && 
+            if (player.getOpenInventory() != null &&
                 inventoryManager.isValidStorageInventory(player.getOpenInventory().getTitle())) {
-                Inventory topInventory = player.getOpenInventory().getTopInventory();
-                topInventory.setItem(slot, null);
+                inventoryManager.updateSlotInOpenInventory(player, slot);
             }
-
-            // Send success message
-            String message = config.getMessage("item-withdrawn")
-                    .replace("%slot%", String.valueOf(slot + 1));
-            player.sendMessage(message);
+            player.sendMessage(config.getMessage("item-withdrawn", Map.of(
+                "slot", String.valueOf(slot + 1)
+            )));
         });
     }
 
@@ -554,18 +880,19 @@ public class StorageManager implements Listener {
 
                 for (ItemStack item : event.getNewItems().values()) {
                     if (item != null && !item.getType().isAir()) {
-                        // Check prohibited items
-                    if (config.isProhibitedItem(item)) {
-                        event.setCancelled(true);
-                        player.sendMessage(config.getMessage("prohibited-item"));
-                        return;
+                        // Check prohibited items (no donor bypass anymore)
+                        if (config.isProhibitedItem(item)) {
+                            event.setCancelled(true);
+                            player.sendMessage(config.getMessage(Constants.Messages.PROHIBITED_ITEM));
+                            return;
                         }
 
-                        // Check max items per slot
+                        // Check max items per slot (no donor bypass anymore)
                         if (item.getAmount() > config.getMaxItemsPerSlot()) {
                             event.setCancelled(true);
-                            player.sendMessage(config.getMessage("max-items-per-slot")
-                                    .replace("%max%", String.valueOf(config.getMaxItemsPerSlot())));
+                            player.sendMessage(config.getMessage(Constants.Messages.MAX_ITEMS_PER_SLOT, Map.of(
+                                "max", String.valueOf(config.getMaxItemsPerSlot())
+                            )));
                             return;
                         }
                     }
@@ -581,12 +908,24 @@ public class StorageManager implements Listener {
     @EventHandler
     public void onInventoryClose(InventoryCloseEvent event) {
         if (!(event.getPlayer() instanceof Player)) return;
-        String title = event.getView().getTitle();
-        if (!inventoryManager.isValidStorageInventory(title)) return;
-
         Player player = (Player) event.getPlayer();
+        
+        // Only process if the player has storage tracked as open
+        if (!inventoryManager.hasStorageOpen(player)) {
+            return;
+        }
+        
+        String title = event.getView().getTitle();
+        
+        // Verify this is actually a storage inventory being closed
+        if (!inventoryManager.isValidStorageInventory(title)) {
+            return;
+        }
+
+        // Save the storage contents and clean up tracking
         UUID storageOwner = inventoryManager.getStorageOwner(title, player);
         inventoryManager.saveInventoryContents(event.getInventory(), storageOwner);
+        inventoryManager.closeStorage(player);
     }
 
     public void saveAllData() {
@@ -599,5 +938,13 @@ public class StorageManager implements Listener {
 
     public void resetPlayerStorage(UUID playerId) {
         dataManager.resetPlayerData(playerId);
+    }
+    
+    public StorageDataManager getDataManager() {
+        return dataManager;
+    }
+    
+    public StorageInventoryManager getInventoryManager() {
+        return inventoryManager;
     }
 }

@@ -1,34 +1,16 @@
+# ====================================
 # StorageSlots Configuration
+# ====================================
+# This file contains ONLY configuration options. All messages are in messages.yml.
 
+# ------------------------------
+# Storage Settings
+# ------------------------------
 storage:
-  # Number of storage slots (1-54)
-  slots: 54
-  max-items-per-slot: 64
-  prevent-item-duplication: true
-
-  # Safe zone settings
-  safezone:
-    enabled: true
-    # Method to use for safezone detection
-    # Options: "region" (WorldGuard regions), "pvp" (PvP status)
-    detection-method: "region"
-    # Region name to check for (if using region method)
-    region-name: "safezone"
-    # PvP priority threshold (if using pvp method)
-    pvp-priority: 0
-    # Message to show when trying to use storage outside safezone
-    message: "&cYou can only use storage in safe zones!"
-
-  # GUI Title (supports color codes and %player% placeholder)
-  title: "&8Storage"
-
-  # Default cost if not specified below
-  default-cost: 1000
-
-  # Require previous slot to be unlocked before buying next
-  require_progression: true
-
-  # Individual slot costs
+  slots: 9  # Number of regular storage slots (1-54)
+  default-cost: 1000.0  # Default cost for slots without specific pricing
+  require-progression: true  # Whether players must unlock slots in order
+  max-items-per-slot: 64  # Maximum items per slot
   costs:
     slot-1: 1000
     slot-2: 2500
@@ -39,46 +21,6 @@ storage:
     slot-7: 100000
     slot-8: 250000
     slot-9: 500000
-
-  # Withdrawal fees
-  withdrawal-fees:
-    # Regular storage slots
-    regular:
-      points: 10
-      money: 100.0
-    # J-G rank slots
-    jg:
-      points: 5
-      money: 50.0
-    # F-D rank slots
-    fd:
-      points: 3
-      money: 30.0
-    # C-A rank slots
-    ca:
-      points: 1
-      money: 10.0
-    # Donor slots
-    donor:
-      points: 0
-      money: 0.0
-
-  # Command triggers for transactions
-  command-triggers:
-    # Commands to run when purchasing a slot
-    purchase:
-      - "eco take %player% %cost%"
-      - "points take %player% %points%"
-    # Commands to run when withdrawing items
-    withdraw:
-      - "eco take %player% %cost%"
-      - "points take %player% %points%"
-    # Commands to run when depositing items
-    deposit:
-      - "eco give %player% %cost%"
-      - "points give %player% %points%"
-
-  # Items that cannot be stored
   prohibited-items:
     - BEDROCK
     - BARRIER
@@ -86,54 +28,12 @@ storage:
     - STRUCTURE_BLOCK
     - STRUCTURE_VOID
     - LIGHT
+    - DEBUG_STICK
+    - KNOWLEDGE_BOOK
 
-# Donor features configuration
-donor:
-  # Enable/disable donor features
-  enabled: true
-  
-  # Donor ranks and their benefits
-  ranks:
-    vip:
-      display-name: "&aVIP"
-      permission: "storageslots.donor.vip"
-      slots: 3
-      features:
-        - "unlimited_items_per_slot"
-        - "bypass_prohibited_items"
-        - "free_withdrawal"
-    mvp:
-      display-name: "&bMVP"
-      permission: "storageslots.donor.mvp"
-      slots: 6
-      features:
-        - "unlimited_items_per_slot"
-        - "bypass_prohibited_items"
-        - "instant_purchase"
-        - "free_withdrawal"
-    elite:
-      display-name: "&6Elite"
-      permission: "storageslots.donor.elite"
-      slots: 9
-      features:
-        - "unlimited_items_per_slot"
-        - "bypass_prohibited_items"
-        - "instant_purchase"
-        - "bypass_rank_requirements"
-        - "free_withdrawal"
-
-  # Donor slot settings
-  slots:
-    # Whether donor slots are separate from regular slots
-    separate: true
-    # Whether donor slots persist after rank expires
-    persist: true
-    # Whether donor slots can be purchased with regular currency
-    purchasable: false
-    # Cost multiplier for purchasing donor slots (if purchasable)
-    cost-multiplier: 2.0
-
-# Rank requirements for slots
+# ------------------------------
+# Rank Requirements
+# ------------------------------
 ranks:
   slot-requirements:
     slot-1: "rank.i"
@@ -145,88 +45,185 @@ ranks:
     slot-7: "rank.c"
     slot-8: "rank.b"
     slot-9: "rank.a"
-
   display-names:
-    "rank.i": "&7I-Rank"
-    "rank.h": "&6H-Rank"
-    "rank.g": "&eG-Rank"
-    "rank.f": "&aF-Rank"
-    "rank.e": "&bE-Rank"
-    "rank.d": "&3D-Rank"
-    "rank.c": "&9C-Rank"
-    "rank.b": "&5B-Rank"
-    "rank.a": "&4A-Rank"
+    "rank.i": "<yellow>I-Rank</yellow>"
+    "rank.h": "<green>H-Rank</green>"
+    "rank.g": "<dark_green>G-Rank</dark_green>"
+    "rank.f": "<aqua>F-Rank</aqua>"
+    "rank.e": "<blue>E-Rank</blue>"
+    "rank.d": "<dark_purple>D-Rank</dark_purple>"
+    "rank.c": "<light_purple>C-Rank</light_purple>"
+    "rank.b": "<pink>B-Rank</pink>"
+    "rank.a": "<red>A-Rank</red>"
 
-# GUI Settings
-gui:
-  locked-slot:
-    # Material for locked slots when player has the required rank
-    has-rank-material: "RED_STAINED_GLASS_PANE"
-    # Material for locked slots when player doesn't have the required rank
-    no-rank-material: "BLACK_STAINED_GLASS_PANE"
-    # Material for locked slots in admin view
-    admin-view-material: "GRAY_STAINED_GLASS_PANE"
-    # Name format for locked slots
-    name: "&c&lLocked Slot #%slot%"
-    # Lore for locked slots
-    lore:
-      - "&7Cost: &e%cost% %currency%"
-      - "&7Required Rank: &e%rank%"
-      - "&7Progress: %progress%"
-      - "&eClick to purchase!"
+# ------------------------------
+# Safezone Settings
+# ------------------------------
+safezone:
+  enabled: true
+  detection-method: "pvp"  # "region", "world", or "pvp"
+  region-name: "safezone"
+  pvp-priority: 0
+  worlds:
+    - "spawn"
+    - "lobby"
 
-  donor-slot:
-    # Material for donor slots
-    material: "GOLD_BLOCK"
-    # Name format for donor slots
-    name: "&6&lDonor Slot #%slot%"
-    # Lore for donor slots
-    lore:
-      - "&7Donor Rank: &e%donor_rank%"
-      - "&7Features:"
-      - "%features%"
+# ------------------------------
+# Donor System
+# ------------------------------
+donor:
+  enabled: true
+  ranks:
+    supporter:
+      display-name: "<gray><bold>SUPPORTER</bold></gray>"
+      permission: "storageslots.donor.supporter"
+      slots: 1
+      features:
+        - "reduced_withdrawal_fees"
+    vip:
+      display-name: "<green><bold>VIP</bold></green>"
+      permission: "storageslots.donor.vip"
+      slots: 2
+      features:
+        - "reduced_withdrawal_fees"
+        - "faster_slot_access"
+    mvp:
+      display-name: "<aqua><bold>MVP</bold></aqua>"
+      permission: "storageslots.donor.mvp"
+      slots: 4
+      features:
+        - "free_withdrawal"
+        - "faster_slot_access"
+        - "slot_discount"
+    king:
+      display-name: "<gold><bold>KING</bold></gold>"
+      permission: "storageslots.donor.king"
+      slots: 5
+      features:
+        - "free_withdrawal"
+        - "faster_slot_access"
+        - "slot_discount"
+        - "priority_support"
+    
+  slots:
+    separate: true  # Donor slots are separate from regular slots
+    persist: true   # Donor slots are permanent
+    purchasable: true  # Donor slots can be purchased
+    cost-multiplier: 2.0  # Cost multiplier for donor slots if purchasable
 
-# Messages
-messages:
-  # Basic messages
-  no-permission: "&cYou don't have permission to do this!"
-  invalid-slot: "&cInvalid slot number!"
-  invalid-number: "&cPlease enter a valid number!"
-  player-not-found: "&cPlayer not found!"
+# ------------------------------
+# Withdrawal Fees
+# ------------------------------
+# Withdrawal fees are charged when players take items out of storage
+# Fees are based on the player's rank, not the slot type
+withdrawal-fees:
+  # Enable/disable withdrawal fees entirely
+  enabled: true
+  
+  # Default fees for players without specific rank permissions
+  default:
+    points: 10
+    money: 100.0
+  
+  # Rank group fees (players with these ranks get these fees)
+  # Groups are checked in order - first match wins
+  rank-groups:
+    # CA Ranks: Rank C, Rank B, Rank A (highest ranks)
+    ca:
+      ranks:
+        - "rank.c"
+        - "rank.b" 
+        - "rank.a"
+      points: 1
+      money: 10.0
+    
+    # FD Ranks: Rank F, Rank E, Rank D (middle ranks)
+    fd:
+      ranks:
+        - "rank.f"
+        - "rank.e"
+        - "rank.d"
+      points: 3
+      money: 30.0
+    
+    # JG Ranks: Rank J, Rank I, Rank H, Rank G (lower ranks)
+    jg:
+      ranks:
+        - "rank.j"  # If you have J rank
+        - "rank.i"
+        - "rank.h"
+        - "rank.g"
+      points: 5
+      money: 50.0
+  
+  # Individual rank overrides (these take priority over group fees)
+  # Useful for fine-tuning specific ranks
+  individual-ranks:
+    # Example: Give A-rank players completely free withdrawals
+    "rank.a":
+      points: 0
+      money: 0.0
+    # Example: Custom fee for a specific rank
+    # "rank.special":
+    #   points: 2
+    #   money: 20.0
+  
+  # Donor rank fees (donors get special treatment)
+  donor:
+    # Supporters get reduced fees
+    supporter:
+      points: 5  # 50% of default
+      money: 50.0
+    
+    # VIP gets even more reduced fees  
+    vip:
+      points: 3
+      money: 30.0
+    
+    # MVP and King get free withdrawals
+    mvp:
+      points: 0
+      money: 0.0
+    
+    king:
+      points: 0
+      money: 0.0
 
-  # Purchase messages
-  already-unlocked: "&cYou've already unlocked this slot!"
-  slot-purchased: "&aUnlocked slot %slot% for %cost% %currency%!"
-  insufficient-funds: "&cYou need %cost% %currency% to unlock this slot! &7(Balance: %balance%)"
-  prohibited-item: "&cYou cannot store this item!"
-  rank-required: "&cYou need %rank% to unlock this slot!"
-  previous-slot-required: "&cYou must unlock the previous slot first!"
-  cant-access-slot: "&cYou cannot access this slot yet!"
+# ------------------------------
+# Withdrawal Cooldown
+# ------------------------------
+withdrawal-cooldown:
+  enabled: true
+  duration-ms: 1500  # 1.5 seconds in milliseconds
+  apply-to-ops: true  # Whether OPs are affected by cooldown
+  # Note: Players with 'storageslots.bypass.cooldown' permission can bypass cooldown
 
-  # Withdrawal messages
-  withdrawal-fee: "&7Withdrawal fee: &e%cost% %currency% or &e%points% points"
-  insufficient-withdrawal-funds: "&cYou need %cost% %currency% or %points% points to withdraw items!"
-  withdrawal-success: "&aSuccessfully withdrew items for %cost% %currency%"
-  withdrawal-success-points: "&aSuccessfully withdrew items for %points% points"
-  free-withdrawal: "&aFree withdrawal (Donor benefit)"
+# ------------------------------
+# Economy Settings
+# ------------------------------
+economy:
+  currency-name: "points"
+  use-vault: false
 
-  # Donor messages
-  donor-feature-disabled: "&cDonor features are currently disabled!"
-  donor-slot-limit: "&cYou have reached your donor slot limit!"
-  donor-slot-persist: "&aYour donor slots will persist after your rank expires!"
-  donor-slot-expired: "&cYour donor rank has expired! Your donor slots will be locked!"
-  donor-feature-unavailable: "&cThis feature is not available for your donor rank!"
+# ------------------------------
+# Security Settings
+# ------------------------------
+security:
+  max-slots-per-player: 9
+  prevent-item-duplication: true
+  log-transactions: true
 
-  # Admin command messages
-  storage-reset: "&aAll storage data has been reset!"
-  player-storage-reset: "&aStorage data has been reset for %player%!"
-  slot-already-owned: "&c%player% already owns slot %slot%!"
-  slot-not-owned: "&c%player% doesn't own slot %slot%!"
-  slot-not-empty: "&cSlot %slot% for %player% contains items and cannot be removed!"
-  slot-given: "&aGave slot %slot% to %player%!"
-  slot-removed: "&aRemoved slot %slot% from %player%!"
-  no-slots-owned: "&c%player% doesn't own any slots!"
+# ------------------------------
+# Auto-Save Settings
+# ------------------------------
+auto-save:
+  enabled: true
+  interval: 300  # In seconds (minimum 60)
 
-  # Slot listing messages
-  slots-list-header: "&e=== Storage slots owned by %player% ==="
-  slots-list-format: "&7- Slot %slot%: %status%"
+# ------------------------------
+# Debug Settings
+# ------------------------------
+debug:
+  enabled: true
+  log-safezone-checks: false
+  log-permission-checks: false

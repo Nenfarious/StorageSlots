@@ -1,0 +1,149 @@
+# ====================================
+# StorageSlots Messages
+# ====================================
+# All messages support MiniMessage formatting
+# Placeholders: {player}, {slot}, {cost}, {currency}, {balance}, {rank}, etc.
+
+prefix: "<gradient:#ff5555:#ffaa00>[StorageSlots]</gradient> "
+
+# General Messages
+no-permission: "{prefix}<red>You don't have permission to do this!</red>"
+invalid-slot: "{prefix}<red>Invalid slot number!</red>"
+invalid-number: "{prefix}<red>Please enter a valid number!</red>"
+player-not-found: "{prefix}<red>Player not found!</red>"
+config-reloaded: "{prefix}<green>Configuration reloaded!</green>"
+
+# Storage Messages
+storage-opened: "{prefix}<green>Storage opened!</green>"
+already-unlocked: "{prefix}<yellow>You've already unlocked this slot!</yellow>"
+slot-purchased: "{prefix}<green>Unlocked slot {slot} for {cost} {currency}!</green>"
+insufficient-funds: "{prefix}<red>You need {cost} {currency} to unlock this slot! <gray>(Balance: {balance})</gray></red>"
+prohibited-item: "{prefix}<red>You cannot store this item!</red>"
+prohibited-item-returned: "{prefix}<yellow>Removed {count} prohibited item(s) from your storage and returned them to your inventory.</yellow>"
+rank-required: "{prefix}<red>You need {rank} to unlock this slot!</red>"
+previous-slot-required: "{prefix}<red>You must unlock the previous slot first!</red>"
+max-slots-reached: "{prefix}<red>You have reached the maximum number of storage slots!</red>"
+max-items-per-slot: "{prefix}<red>You can only store {max} item(s) per slot!</red>"
+
+# Safezone Messages
+safezone-required: "{prefix}<red>You can only use storage in safe zones!</red>"
+not-in-safezone: "{prefix}<red>You must be in a safezone to access storage!</red>"
+
+# Admin Messages
+storage-reset: "{prefix}<green>All storage has been reset!</green>"
+player-storage-reset: "{prefix}<green>{player}'s storage has been reset!</green>"
+slot-already-owned: "{prefix}<red>{player} already owns slot {slot}!</red>"
+slot-not-owned: "{prefix}<red>{player} doesn't own slot {slot}!</red>"
+slot-not-empty: "{prefix}<red>Cannot remove slot {slot} from {player} because it contains items!</red>"
+slot-removed: "{prefix}<green>Removed slot {slot} from {player}!</green>"
+slot-given: "{prefix}<green>Gave slot {slot} to {player}!</green>"
+no-slots-owned: "{prefix}<red>{player} doesn't own any slots!</red>"
+slots-list-header: "{prefix}<yellow>Slots owned by {player}:</yellow>"
+slots-list-format: "{prefix}<gray>- Slot {slot} <dark_gray>({status})</dark_gray></gray>"
+cost-set: "{prefix}<green>Set cost for slot {slot} to {cost} {currency}!</green>"
+
+# Donor Messages
+donor-feature-unavailable: "{prefix}<red>This donor feature is not available!</red>"
+
+# Withdrawal Messages
+withdrawal-fee: "{prefix}<yellow>Withdrawal fee: {fee} {currency}</yellow>"
+insufficient-withdrawal-funds: "{prefix}<red>You need {fee} {currency} to withdraw this item!</red>"
+insufficient-points: "{prefix}<red>You need {points} points to withdraw this item! <gray>(Balance: {balance})</gray></red>"
+item-withdrawn: "{prefix}<green>Item withdrawn from slot {slot}!</green>"
+free-withdrawal: "{prefix}<green>Item withdrawn (free for donors)!</green>"
+
+# Command Usage Messages
+usage-storage: "{prefix}<gray>Usage: /storage</gray>"
+usage-buystorage: "{prefix}<gray>Usage: /buystorage <slot></gray>"
+usage-storagecost: "{prefix}<gray>Usage: /storagecost <slot> <cost></gray>"
+usage-storagedelete: "{prefix}<gray>Usage: /storagedelete <player|all></gray>"
+usage-storageadmin: "{prefix}<gray>Usage: /storageadmin <player></gray>"
+usage-viewstorage: "{prefix}<gray>Usage: /viewstorage <player></gray>"
+usage-removeslot: "{prefix}<gray>Usage: /removeslot <player> <slot></gray>"
+usage-giveslot: "{prefix}<gray>Usage: /giveslot <player> <slot></gray>"
+usage-listslots: "{prefix}<gray>Usage: /listslots <player></gray>"
+usage-debugsafezone: "{prefix}<gray>Usage: /debugsafezone</gray>"
+
+# GUI Messages
+gui:
+  locked-slot:
+    # Different colored titles for each slot to match glass pane colors
+    names:
+      slot-1: "<yellow><bold>-- STORAGE SLOT #1 --</bold></yellow>"      # Yellow glass
+      slot-2: "<green><bold>-- STORAGE SLOT #2 --</bold></green>"        # Lime glass  
+      slot-3: "<dark_green><bold>-- STORAGE SLOT #3 --</bold></dark_green>" # Green glass
+      slot-4: "<aqua><bold>-- STORAGE SLOT #4 --</bold></aqua>"          # Light blue glass
+      slot-5: "<blue><bold>-- STORAGE SLOT #5 --</bold></blue>"          # Blue glass
+      slot-6: "<dark_purple><bold>-- STORAGE SLOT #6 --</bold></dark_purple>" # Purple glass
+      slot-7: "<light_purple><bold>-- STORAGE SLOT #7 --</bold></light_purple>" # Magenta glass
+      slot-8: "<pink><bold>-- STORAGE SLOT #8 --</bold></pink>"          # Pink glass
+      slot-9: "<red><bold>-- STORAGE SLOT #9 --</bold></red>"            # Red glass
+    # Fallback name for any slot not specifically defined
+    name: "<yellow><bold>-- STORAGE SLOT #{slot} --</bold></yellow>"
+    lore-no-requirements:
+      - "<gray>Storage slot locked until {rank}"
+    lore-has-requirements:
+      - "<gray>Cost: <yellow>{cost} {currency}</yellow>"
+      - ""
+      - "<yellow>Click to purchase!</yellow>"
+    
+  donor-slot:
+    name: "<gold><bold>Donor Slot #{slot}</bold></gold>"
+    lore:
+      - "<gray>Donor Rank: <yellow>{donor_rank}</yellow>"
+      - "<gray>Features:"
+      - "{features}"
+      - ""
+      - "<yellow>Click to access!</yellow>"
+  
+  storage-title: "<dark_gray>Storage - {player}</dark_gray>"
+  admin-storage-title: "<dark_gray>Storage - {target} (Admin View)</dark_gray>"
+
+  # Filler Item Tips
+  tips:
+    withdrawal-fees:
+      name: "<aqua><bold>💰 Withdrawal Costs</bold></aqua>"
+      lore:
+        - "<gray>Taking items out costs points:</gray>"
+        - "<yellow>• 10 points (regular players)</yellow>"
+        - "<green>• FREE for donors!</green>"
+    
+    storage-info:
+      name: "<blue><bold>📦 Storage Info</bold></blue>"
+      lore:
+        - "<gray>• Use in safezones only</gray>"
+        - "<gray>• Max 64 items per slot</gray>"
+        - "<gray>• Items are saved automatically</gray>"
+
+# Error Messages
+errors:
+  config-load-failed: "{prefix}<red>Failed to load configuration: {error}</red>"
+  config-save-failed: "{prefix}<red>Failed to save configuration!</red>"
+  data-save-failed: "{prefix}<red>Failed to save player data: {error}</red>"
+  data-load-failed: "{prefix}<red>Failed to load player data: {error}</red>"
+  data-operation-failed: "{prefix}<red>Data operation failed!</red>"
+  inventory-creation-failed: "{prefix}<red>Failed to create storage inventory!</red>"
+  economy-transaction-failed: "{prefix}<red>Economic transaction failed!</red>"
+  rank-check-failed: "{prefix}<red>Failed to check rank requirements!</red>"
+  safezone-check-failed: "{prefix}<red>Failed to check safezone status!</red>"
+  command-execution-failed: "{prefix}<red>Command execution failed: {error}</red>"
+  unknown-command: "{prefix}<red>Unknown command!</red>"
+
+# Success Messages
+success:
+  plugin-enabled: "StorageSlots has been enabled successfully!"
+  plugin-disabled: "StorageSlots has been disabled successfully!"
+  data-saved: "All player data saved successfully!"
+  economy-connected: "Successfully connected to economy system!"
+  permissions-connected: "Successfully connected to permissions system!"
+
+# Debug Messages
+debug:
+  safezone-check: "Safezone check for {player}: {result} (Method: {method})"
+  rank-check: "Rank check for {player}: {result} (Required: {rank})"
+  slot-purchase: "Player {player} attempting to purchase slot {slot} for {cost}"
+  data-operation: "Data operation: {operation} for player {player}"
+
+# Backpack Notification Messages
+backpack-slot-unlocked: "{prefix}<green>You have unlocked a new backpack slot! Use {bp_command} to view your storage.</green>"
+backpack-reminder: "{prefix}<yellow>Reminder: You have unlockable storage slots! Use {storage_command} to view.</yellow>" 

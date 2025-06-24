@@ -5,14 +5,14 @@ api-version: '1.13'
 author: PsyChNOdelic
 description: Storage system with rank progression
 
-depend: [WorldGuard]
-softdepend: [PlayerPoints, Vault, LuckPerms]
+depend: [WorldGuard, PlayerPoints]
+softdepend: [Vault, LuckPerms]
 
 commands:
   storage:
     description: Open your storage interface
     usage: /<command>
-    aliases: [slots]
+    aliases: [slots, backpack, bp]
   buystorage:
     description: Purchase a storage slot
     usage: /<command> <slot>
@@ -55,6 +55,36 @@ commands:
     usage: /<command> <player>
     permission: storageslots.admin
     aliases: [slotstatus]
+  togglecooldown:
+    description: Toggle withdrawal cooldown bypass for yourself or another player
+    usage: /<command> [player]
+    permission: storageslots.admin
+    aliases: [cooldowntoggle, cooldown]
+  testeconomy:
+    description: Test PlayerPoints integration and show balance
+    usage: /<command>
+    permission: storageslots.admin
+    aliases: [testpoints, economytest]
+  testfallback:
+    description: Test PlayerPoints fallback mechanism
+    usage: /<command>
+    permission: storageslots.admin
+    aliases: [testcmd, fallbacktest]
+  resetapi:
+    description: Reset PlayerPoints API status to working
+    usage: /<command>
+    permission: storageslots.admin
+    aliases: [resetpoints, apireset]
+  testnotifications:
+    description: Test the notification system and show debug information
+    usage: /<command>
+    permission: storageslots.admin
+    aliases: [testnotify, notificationtest]
+  debugsafezone:
+    description: Debug safezone detection for current location
+    usage: /<command>
+    permission: storageslots.admin
+    aliases: [safezonetest, debugsafe]
 
 permissions:
   storageslots.use:
@@ -66,6 +96,9 @@ permissions:
   storageslots.bypass.cost:
     description: Bypass cost requirements for slots
     default: op
+  storageslots.bypass.cooldown:
+    description: Bypass withdrawal cooldown
+    default: op
   storageslots.admin:
     description: Access to administrative commands
     default: op
@@ -76,22 +109,27 @@ permissions:
       storageslots.use: true
       storageslots.bypass.rank: true
       storageslots.bypass.cost: true
+      storageslots.bypass.cooldown: true
       storageslots.admin: true
 
   # Donor permissions
+  storageslots.donor.supporter:
+    description: Supporter donor rank benefits
+    default: false
   storageslots.donor.vip:
     description: VIP donor rank benefits
     default: false
   storageslots.donor.mvp:
     description: MVP donor rank benefits
     default: false
-  storageslots.donor.elite:
-    description: Elite donor rank benefits
+  storageslots.donor.king:
+    description: King donor rank benefits
     default: false
   storageslots.donor.*:
     description: Grants all donor rank benefits
     default: op
     children:
+      storageslots.donor.supporter: true
       storageslots.donor.vip: true
       storageslots.donor.mvp: true
-      storageslots.donor.elite: true
+      storageslots.donor.king: true

@@ -17,15 +17,21 @@ public class PlayerStorageData implements Serializable, JsonSerializable {
     private final Set<String> activeDonorFeatures;
     private final Set<String> donorFeatures;
     private boolean dirty;
+    private boolean hasSeenNewSlotNotification;
+    private long lastReminderTime;
+    private String lastNotifiedRank;
 
     public PlayerStorageData(UUID playerId) {
         this.playerId = playerId;
         this.items = new HashMap<>();
-        this.unlockedSlots = new TreeSet<>(); // Using TreeSet for ordered slots
+        this.unlockedSlots = new HashSet<>();
         this.donorSlots = new HashSet<>();
         this.currentDonorRank = null;
         this.activeDonorFeatures = new HashSet<>();
         this.donorFeatures = new HashSet<>();
+        this.hasSeenNewSlotNotification = false;
+        this.lastReminderTime = 0;
+        this.lastNotifiedRank = null;
     }
 
     public UUID getPlayerId() {
@@ -161,6 +167,36 @@ public class PlayerStorageData implements Serializable, JsonSerializable {
 
     public Set<String> getDonorFeatures() {
         return new HashSet<>(donorFeatures);
+    }
+
+    // Notification tracking methods
+    public boolean hasSeenNewSlotNotification() {
+        return hasSeenNewSlotNotification;
+    }
+
+    public void setSeenNewSlotNotification(boolean seen) {
+        this.hasSeenNewSlotNotification = seen;
+    }
+
+    public long getLastReminderTime() {
+        return lastReminderTime;
+    }
+
+    public void setLastReminderTime(long time) {
+        this.lastReminderTime = time;
+    }
+
+    public String getLastNotifiedRank() {
+        return lastNotifiedRank;
+    }
+
+    public void setLastNotifiedRank(String rank) {
+        this.lastNotifiedRank = rank;
+    }
+
+    public void resetNotificationStatus() {
+        this.hasSeenNewSlotNotification = false;
+        this.lastReminderTime = 0;
     }
 
     // For data migration or version upgrades
