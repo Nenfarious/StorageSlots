@@ -4,7 +4,7 @@
 # All messages support MiniMessage formatting
 # Placeholders: {player}, {slot}, {cost}, {currency}, {balance}, {rank}, etc.
 
-prefix: "<gradient:#ff5555:#ffaa00>[StorageSlots]</gradient> "
+prefix: "<color:#00a1e6>✦</color> "
 
 # General Messages
 no-permission: "{prefix}<red>You don't have permission to do this!</red>"
@@ -14,7 +14,7 @@ player-not-found: "{prefix}<red>Player not found!</red>"
 config-reloaded: "{prefix}<green>Configuration reloaded!</green>"
 
 # Storage Messages
-storage-opened: "{prefix}<green>Storage opened!</green>"
+storage-opened: "{prefix}<green>Backpack opened!</green>"
 already-unlocked: "{prefix}<yellow>You've already unlocked this slot!</yellow>"
 slot-purchased: "{prefix}<green>Unlocked slot {slot} for {cost} {currency}!</green>"
 insufficient-funds: "{prefix}<red>You need {cost} {currency} to unlock this slot! <gray>(Balance: {balance})</gray></red>"
@@ -43,14 +43,21 @@ slots-list-format: "{prefix}<gray>- Slot {slot} <dark_gray>({status})</dark_gray
 cost-set: "{prefix}<green>Set cost for slot {slot} to {cost} {currency}!</green>"
 
 # Donor Messages
+donor-slot-purchased: "{prefix}<green>Unlocked donor slot {slot} for {cost} {currency}!</green>"
 donor-feature-unavailable: "{prefix}<red>This donor feature is not available!</red>"
 
 # Withdrawal Messages
 withdrawal-fee: "{prefix}<yellow>Withdrawal fee: {fee} {currency}</yellow>"
 insufficient-withdrawal-funds: "{prefix}<red>You need {fee} {currency} to withdraw this item!</red>"
-insufficient-points: "{prefix}<red>You need {points} points to withdraw this item! <gray>(Balance: {balance})</gray></red>"
+insufficient-points: "{prefix}<red>You need {points} {currency} to withdraw this item! <gray>(Balance: {balance})</gray></red>"
+insufficient-money: "{prefix}<red>You need {money} {currency} to withdraw this item! <gray>(Balance: {balance})</gray></red>"
 item-withdrawn: "{prefix}<green>Item withdrawn from slot {slot}!</green>"
+item-swapped: "{prefix}<green>Items swapped in slot {slot}!</green>"
 free-withdrawal: "{prefix}<green>Item withdrawn (free for donors)!</green>"
+withdrawal-failed: "{prefix}<red>Failed to withdraw item! Please try again.</red>"
+withdrawal-fee-paid: "{prefix}<yellow>Withdrawal fee paid: {fee} {currency}</yellow>"
+payment-failed: "{prefix}<red>Payment failed! Please try again.</red>"
+inventory-full-item-dropped: "{prefix}<yellow>Your inventory is full! The {item} has been dropped on the ground.</yellow>"
 
 # Command Usage Messages
 usage-storage: "{prefix}<gray>Usage: /storage</gray>"
@@ -96,20 +103,20 @@ gui:
       - ""
       - "<yellow>Click to access!</yellow>"
   
-  storage-title: "<dark_gray>Storage - {player}</dark_gray>"
-  admin-storage-title: "<dark_gray>Storage - {target} (Admin View)</dark_gray>"
+  storage-title: "<dark_gray>Backpack - {player}</dark_gray>"
+  admin-storage-title: "<dark_gray>Backpack - {target} (Admin View)</dark_gray>"
 
   # Filler Item Tips
   tips:
     withdrawal-fees:
       name: "<aqua><bold>💰 Withdrawal Costs</bold></aqua>"
       lore:
-        - "<gray>Taking items out costs points:</gray>"
-        - "<yellow>• 10 points (regular players)</yellow>"
+        - "<gray>Taking items out costs {currency}:</gray>"
+        - "<yellow>• 10 {currency} (regular players)</yellow>"
         - "<green>• FREE for donors!</green>"
     
     storage-info:
-      name: "<blue><bold>📦 Storage Info</bold></blue>"
+      name: "<blue><bold>📦 Backpack Info</bold></blue>"
       lore:
         - "<gray>• Use in safezones only</gray>"
         - "<gray>• Max 64 items per slot</gray>"
@@ -145,5 +152,5 @@ debug:
   data-operation: "Data operation: {operation} for player {player}"
 
 # Backpack Notification Messages
-backpack-slot-unlocked: "{prefix}<green>You have unlocked a new backpack slot! Use {bp_command} to view your storage.</green>"
-backpack-reminder: "{prefix}<yellow>Reminder: You have unlockable storage slots! Use {storage_command} to view.</yellow>" 
+backpack-slot-unlocked: "{prefix}<green>You have unlocked a new backpack slot! Use <yellow><bold>/bp</bold></yellow> to view your storage.</green>"
+backpack-reminder: "{prefix}<yellow>Reminder: You have unlockable storage slots! Use <bold>/storage</bold> to view.</yellow>" 

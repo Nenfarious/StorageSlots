@@ -8,19 +8,19 @@
 # ------------------------------
 storage:
   slots: 9  # Number of regular storage slots (1-54)
-  default-cost: 1000.0  # Default cost for slots without specific pricing
+  default-cost: 1250.0  # Default cost for slots without specific pricing
   require-progression: true  # Whether players must unlock slots in order
   max-items-per-slot: 64  # Maximum items per slot
   costs:
-    slot-1: 1000
+    slot-1: 2500
     slot-2: 2500
     slot-3: 5000
-    slot-4: 10000
-    slot-5: 25000
-    slot-6: 50000
-    slot-7: 100000
-    slot-8: 250000
-    slot-9: 500000
+    slot-4: 5000
+    slot-5: 7500
+    slot-6: 10000
+    slot-7: 12000
+    slot-8: 15000
+    slot-9: 25000
   prohibited-items:
     - BEDROCK
     - BARRIER
@@ -30,6 +30,33 @@ storage:
     - LIGHT
     - DEBUG_STICK
     - KNOWLEDGE_BOOK
+    - IRON_SWORD
+    - DIAMOND_SWORD
+    - NETHERITE_SWORD
+    - IRON_AXE
+    - DIAMOND_AXE
+    - NETHERITE_AXE
+    - IRON_HELMET
+    - DIAMOND_HELMET
+    - NETHERITE_HELMET
+    - IRON_CHESTPLATE
+    - DIAMOND_CHESTPLATE
+    - NETHERITE_CHESTPLATE
+    - IRON_LEGGINGS
+    - DIAMOND_LEGGINGS
+    - NETHERITE_LEGGINGS
+    - IRON_BOOTS
+    - DIAMOND_BOOTS
+    - NETHERITE_BOOTS
+    - BOW
+    - CROSSBOW
+    - ARROW
+    - SPECTRAL_ARROW
+    - TIPPED_ARROW
+    - GOLDEN_APPLE
+    - ENCHANTED_GOLDEN_APPLE
+    - GOLDEN_CARROT
+    - WIND_CHARGE
 
 # ------------------------------
 # Rank Requirements
@@ -65,8 +92,7 @@ safezone:
   region-name: "safezone"
   pvp-priority: 0
   worlds:
-    - "spawn"
-    - "lobby"
+    - "aSeason4"
 
 # ------------------------------
 # Donor System
@@ -74,36 +100,18 @@ safezone:
 donor:
   enabled: true
   ranks:
-    supporter:
-      display-name: "<gray><bold>SUPPORTER</bold></gray>"
-      permission: "storageslots.donor.supporter"
-      slots: 1
-      features:
-        - "reduced_withdrawal_fees"
     vip:
       display-name: "<green><bold>VIP</bold></green>"
       permission: "storageslots.donor.vip"
-      slots: 2
-      features:
-        - "reduced_withdrawal_fees"
-        - "faster_slot_access"
+      slots: 1
     mvp:
       display-name: "<aqua><bold>MVP</bold></aqua>"
       permission: "storageslots.donor.mvp"
-      slots: 4
-      features:
-        - "free_withdrawal"
-        - "faster_slot_access"
-        - "slot_discount"
+      slots: 3
     king:
       display-name: "<gold><bold>KING</bold></gold>"
       permission: "storageslots.donor.king"
       slots: 5
-      features:
-        - "free_withdrawal"
-        - "faster_slot_access"
-        - "slot_discount"
-        - "priority_support"
     
   slots:
     separate: true  # Donor slots are separate from regular slots
@@ -134,8 +142,7 @@ withdrawal-fees:
         - "rank.c"
         - "rank.b" 
         - "rank.a"
-      points: 1
-      money: 10.0
+      points: 500
     
     # FD Ranks: Rank F, Rank E, Rank D (middle ranks)
     fd:
@@ -143,8 +150,7 @@ withdrawal-fees:
         - "rank.f"
         - "rank.e"
         - "rank.d"
-      points: 3
-      money: 30.0
+      points: 300
     
     # JG Ranks: Rank J, Rank I, Rank H, Rank G (lower ranks)
     jg:
@@ -153,8 +159,7 @@ withdrawal-fees:
         - "rank.i"
         - "rank.h"
         - "rank.g"
-      points: 5
-      money: 50.0
+      points: 200
   
   # Individual rank overrides (these take priority over group fees)
   # Useful for fine-tuning specific ranks
@@ -171,23 +176,23 @@ withdrawal-fees:
   # Donor rank fees (donors get special treatment)
   donor:
     # Supporters get reduced fees
-    supporter:
-      points: 5  # 50% of default
-      money: 50.0
+    #supporter:
+      #points: 5  # 50% of default
+      #money: 50.0
     
     # VIP gets even more reduced fees  
-    vip:
-      points: 3
-      money: 30.0
+    #vip:
+      #points: 3
+      #money: 30.0
     
     # MVP and King get free withdrawals
-    mvp:
-      points: 0
-      money: 0.0
+    #mvp:
+      #points: 0
+      #money: 0.0
     
-    king:
-      points: 0
-      money: 0.0
+    #king:
+      #points: 0
+      #money: 0.0
 
 # ------------------------------
 # Withdrawal Cooldown
@@ -202,8 +207,20 @@ withdrawal-cooldown:
 # Economy Settings
 # ------------------------------
 economy:
-  currency-name: "points"
-  use-vault: false
+  # Currency for slot purchases (buying new storage slots)
+  slot-purchase:
+    currency: "money"  # "points" or "money"
+    use-vault: false    # true for Vault economy, false for PlayerPoints
+  
+  # Currency for withdrawal fees (taking items out of storage)
+  withdrawal-fees:
+    currency: "points"  # "points" or "money" 
+    use-vault: false    # true for Vault economy, false for PlayerPoints
+  
+  # Currency for donor slot purchases (if enabled)
+  donor-slots:
+    currency: "money"  # "points" or "money"
+    use-vault: false    # true for Vault economy, false for PlayerPoints
 
 # ------------------------------
 # Security Settings
@@ -227,3 +244,6 @@ debug:
   enabled: true
   log-safezone-checks: false
   log-permission-checks: false
+  log-withdrawal-fees: false
+  log-slot-operations: false
+  log-donor-slot-actions: false
